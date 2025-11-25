@@ -348,6 +348,31 @@ Room* Level::getStartRoom() {
     return getRoom(startGridX, startGridY);
 }
 
+Room* Level::getBossRoom() {
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        for (int x = 0; x < GRID_WIDTH; x++) {
+            if (grid[y][x].isGenerated() && grid[y][x].getType() == RoomType::BOSS) {
+                return &grid[y][x];
+            }
+        }
+    }
+    return nullptr;
+}
+
+void Level::getBossRoomGridPos(int& outX, int& outY) {
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        for (int x = 0; x < GRID_WIDTH; x++) {
+            if (grid[y][x].isGenerated() && grid[y][x].getType() == RoomType::BOSS) {
+                outX = x;
+                outY = y;
+                return;
+            }
+        }
+    }
+    outX = startGridX;
+    outY = startGridY;
+}
+
 void Level::setCurrentRoom(int gridX, int gridY) {
     Room* room = getRoom(gridX, gridY);
     if (room) {

@@ -140,9 +140,9 @@ void Player::handleShootingInput(ProjectileManager* projectileManager) {
 }
 
 void Player::handleSubmergeInput() {
-    if (pad->getPressed().Square) {
+    if (pad->getPressed().Cross) {
         trySubmerge();
-    } else if (submerged && !pad->getPressed().Square) {
+    } else if (submerged && !pad->getPressed().Cross) {
         // Released button - start surfacing
         // For now, instant surface. Could add a delay.
         submerged = false;
@@ -188,6 +188,11 @@ void Player::updateInvincibility(float deltaTime) {
 }
 
 void Player::takeDamage(int amount) {
+    // Cheat: God mode
+    if (Constants::Cheats::GOD_MODE) {
+        return;
+    }
+    
     if (isInvincible() || submerged) {
         return;  // Can't take damage while invincible or underwater
     }

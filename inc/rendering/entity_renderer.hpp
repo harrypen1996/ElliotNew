@@ -42,6 +42,7 @@ private:
     Tyra::Sprite playerSprite;
     Tyra::Sprite projectileSprite;
     Tyra::Sprite mobSprite;  // Sprite sheet for all mobs
+    Tyra::Sprite submergedSprite;
     
     int flashCounter;  // For invincibility flash effect
 };

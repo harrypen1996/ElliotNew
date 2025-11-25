@@ -41,11 +41,17 @@ void CollisionManager::checkCollisions(Player* player,
 void CollisionManager::checkPlayerMobCollisions(Player* player, MobManager* mobManager) {
     if (!player || !mobManager) return;
     
+    // Player is immune while submerged
+    if (player->isSubmerged()) return;
+    
     Tyra::Vec2 playerSize(Constants::PLAYER_SIZE / Constants::TILE_SIZE,
                           Constants::PLAYER_SIZE / Constants::TILE_SIZE);
     
     for (auto& mob : mobManager->getMobs()) {
         if (!mob.active) continue;
+        
+        // Submerged mobs can't hurt player
+        if (mob.submerged) continue;
         
         Tyra::Vec2 mobSizeInTiles(mob.size.x / Constants::TILE_SIZE,
                                    mob.size.y / Constants::TILE_SIZE);
@@ -73,12 +79,22 @@ void CollisionManager::checkProjectileMobCollisions(ProjectileManager* projectil
         for (auto& mob : mobs) {
             if (!mob.active) continue;
             
+            // Submerged mobs can't be hit by projectiles
+            if (mob.submerged) continue;
+            
             Tyra::Vec2 mobSizeInTiles(mob.size.x / Constants::TILE_SIZE,
                                        mob.size.y / Constants::TILE_SIZE);
             
             if (checkAABB(projectile.position, projSize, mob.position, mobSizeInTiles)) {
                 // Projectile hit mob
-                mob.health -= projectile.getDamage();
+                float damage = projectile.getDamage();
+                
+                // Cheat: One-hit kills
+                if (Constants::Cheats::ONE_HIT_KILLS) {
+                    damage = 9999.0f;
+                }
+                
+                mob.health -= damage;
                 if (mob.health <= 0) {
                     mob.active = false;
                 }
@@ -92,6 +108,9 @@ void CollisionManager::checkProjectileMobCollisions(ProjectileManager* projectil
 void CollisionManager::checkProjectilePlayerCollisions(ProjectileManager* projectileManager, 
                                                         Player* player) {
     if (!projectileManager || !player) return;
+    
+    // Player is immune while submerged
+    if (player->isSubmerged()) return;
     
     Tyra::Vec2 playerSize(Constants::PLAYER_SIZE / Constants::TILE_SIZE,
                           Constants::PLAYER_SIZE / Constants::TILE_SIZE);

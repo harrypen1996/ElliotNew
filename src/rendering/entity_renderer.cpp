@@ -34,14 +34,21 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     projectileSprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
     projectileTexture->addLink(projectileSprite.id);
     
-    // Load mob sprite sheet (512x512, 32x32 tiles)
-    // Layout: row 0 = duck(0), player(1), frog(2), swan(3), ...
+    // Load mob sprite sheet (128x256, 64x64 tiles)
     filepath = Tyra::FileUtils::fromCwd("mobs_new.png");
     auto* mobTexture = textureRepo->add(filepath);
     
     mobSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    mobSprite.size = Tyra::Vec2(32.0f, 32.0f);  // Each tile is 32x32
+    mobSprite.size = Tyra::Vec2(64.0f, 64.0f);
     mobTexture->addLink(mobSprite.id);
+    
+    // Load submerged sprite (for entities underwater)
+    filepath = Tyra::FileUtils::fromCwd("submerged.png");
+    auto* submergedTexture = textureRepo->add(filepath);
+    
+    submergedSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    submergedSprite.size = Tyra::Vec2(64.0f, 64.0f);
+    submergedTexture->addLink(submergedSprite.id);
     
     TYRA_LOG("EntityRenderer: Initialized");
 }
@@ -50,6 +57,7 @@ void EntityRenderer::cleanup(Tyra::TextureRepository* textureRepo) {
     textureRepo->freeBySprite(playerSprite);
     textureRepo->freeBySprite(projectileSprite);
     textureRepo->freeBySprite(mobSprite);
+    textureRepo->freeBySprite(submergedSprite);
 }
 
 void EntityRenderer::render(Tyra::Renderer2D* renderer, 
@@ -80,8 +88,19 @@ void EntityRenderer::renderPlayer(Tyra::Renderer2D* renderer,
     
     Tyra::Vec2 screenPos = camera->worldToScreen(player->position);
     
-    playerSprite.position = screenPos;
-    renderer->render(playerSprite);
+    // Render submerged sprite if player is underwater
+    if (player->isSubmerged()) {
+        Tyra::Sprite sprite;
+        sprite.id = submergedSprite.id;
+        sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+        sprite.size = Tyra::Vec2(64.0f, 64.0f);
+        sprite.position = screenPos;
+        sprite.scale = Constants::PLAYER_SIZE / 64.0f;
+        renderer->render(sprite);
+    } else {
+        playerSprite.position = screenPos;
+        renderer->render(playerSprite);
+    }
 }
 
 void EntityRenderer::renderProjectiles(Tyra::Renderer2D* renderer, 
@@ -127,17 +146,29 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
                                  const MobManager* mobManager) {
     if (!mobManager || !camera) return;
     
-    // Sprite sheet layout (32x32 tiles, VERTICAL):
-    // Row 0: duck
-    // Row 2: frog
-    // Row 3-4: boss (2 tiles tall)
-    // Row 5: swan
-    const float tileSize = 32.0f;
+    // Sprite sheet layout (128x256, 64x64 tiles, VERTICAL):
+    // Row 0 (y=0):   Duck 64x64
+    // Row 1 (y=64):  Swan 64x64
+    // Row 2 (y=128): Frog 64x64
+    // Row 3 (y=192): Trolly/Boss 64x64
+    const float tileSize = 64.0f;
     
     for (const auto& mob : mobManager->getMobs()) {
         if (!mob.active) continue;
         
         Tyra::Vec2 screenPos = camera->worldToScreen(mob.position);
+        
+        // Handle submerged state - render submerged sprite instead
+        if (mob.submerged) {
+            Tyra::Sprite sprite;
+            sprite.id = submergedSprite.id;
+            sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+            sprite.size = Tyra::Vec2(64.0f, 64.0f);
+            sprite.position = screenPos;
+            sprite.scale = mob.size.x / 64.0f;
+            renderer->render(sprite);
+            continue;
+        }
         
         // Create sprite for this mob
         Tyra::Sprite sprite;
@@ -145,10 +176,8 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
         sprite.position = screenPos;
         
-        // Select Y offset and size based on mob type
+        // Select Y offset based on mob type
         float offsetY = 0.0f;
-        float srcWidth = 64.0f;
-        float srcHeight = 64.0f;  // Default 32px tall
         
         switch (mob.type) {
             case MobType::DUCK:
@@ -161,26 +190,18 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
                 offsetY = 128.0f;  // Row 2
                 break;
             case MobType::BOSS:
-                offsetY = 192.0f;   // Row 3
+                offsetY = 192.0f;  // Row 3 (trolly/boss)
                 break;
             default:
                 offsetY = 0.0f;
                 break;
         }
         
-        sprite.size = Tyra::Vec2(srcWidth, srcHeight);
+        sprite.size = Tyra::Vec2(tileSize, tileSize);
         sprite.offset = Tyra::Vec2(0.0f, offsetY);
         
         // Scale sprite to match mob size (mob.size is in pixels)
-        sprite.scale = 0.5f;//mob.size.x / tileSize;
-        
-        // Handle submerged state (frog underwater)
-        if (mob.submerged) {
-            // Make semi-transparent when submerged
-            sprite.color = Tyra::Color(128, 128, 180, 100);
-            // Also scale down slightly to show "sinking"
-            sprite.scale *= 0.6f;
-        }
+        sprite.scale = mob.size.x / tileSize;
         
         renderer->render(sprite);
     }

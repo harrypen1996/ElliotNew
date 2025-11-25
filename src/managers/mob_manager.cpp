@@ -33,24 +33,72 @@ void MobManager::spawnMobsForRoom(Room* room, int levelNumber) {
     float roomWidth = static_cast<float>(room->getWidth());
     float roomHeight = static_cast<float>(room->getHeight());
     
-    // Boss rooms get one tough boss
+    // Boss rooms get a level-specific boss
     if (room->getType() == RoomType::BOSS) {
         MobData boss;
         boss.position = Tyra::Vec2(roomWidth / 2.0f, roomHeight / 2.0f - 2.0f);
         boss.velocity = Tyra::Vec2(0, 0);
-        boss.size = Tyra::Vec2(64.0f, 64.0f);
-        boss.health = 15.0f + levelNumber * 5.0f;
-        boss.maxHealth = boss.health;
-        boss.speed = 0.025f;
         boss.active = true;
-        boss.type = MobType::BOSS;
-        boss.state = MobState::IDLE;
         boss.stateTimer = 0;
-        boss.actionCooldown = 0;
+        boss.actionCooldown = 60;  // Initial delay before attacking
         boss.facingRight = true;
         boss.submerged = false;
+        boss.rotation = 0;
+        boss.phase = 1;
+        boss.attackPattern = 0;
+        boss.circleAngle = 0;
+        boss.chargeSpeed = 0;
+        boss.tailSweepAngle = 0;
+        
+        // Spawn different boss based on level
+        switch (levelNumber) {
+            case 1:
+                // PIKE - Giant fish boss
+                boss.type = MobType::BOSS_PIKE;
+                boss.size = Tyra::Vec2(96.0f, 48.0f);  // Long fish shape
+                boss.health = 25.0f;
+                boss.maxHealth = boss.health;
+                boss.speed = 0.04f;
+                boss.state = MobState::PIKE_CIRCLING;
+                boss.submerged = true;  // Starts underwater
+                TYRA_LOG("MobManager: Spawned PIKE boss");
+                break;
+                
+            case 2:
+                // LOCK KEEPER
+                boss.type = MobType::BOSS_LOCKKEEPER;
+                boss.size = Tyra::Vec2(64.0f, 64.0f);
+                boss.health = 30.0f;
+                boss.maxHealth = boss.health;
+                boss.speed = 0.02f;
+                boss.state = MobState::IDLE;
+                TYRA_LOG("MobManager: Spawned LOCK KEEPER boss");
+                break;
+                
+            case 3:
+                // NANNY
+                boss.type = MobType::BOSS_NANNY;
+                boss.size = Tyra::Vec2(64.0f, 64.0f);
+                boss.health = 35.0f;
+                boss.maxHealth = boss.health;
+                boss.speed = 0.015f;
+                boss.state = MobState::IDLE;
+                TYRA_LOG("MobManager: Spawned NANNY boss");
+                break;
+                
+            default:
+                // Fallback generic boss
+                boss.type = MobType::BOSS;
+                boss.size = Tyra::Vec2(64.0f, 64.0f);
+                boss.health = 15.0f + levelNumber * 5.0f;
+                boss.maxHealth = boss.health;
+                boss.speed = 0.025f;
+                boss.state = MobState::IDLE;
+                TYRA_LOG("MobManager: Spawned generic boss");
+                break;
+        }
+        
         mobs.push_back(boss);
-        TYRA_LOG("MobManager: Spawned boss with ", boss.health, " health");
         return;
     }
     
@@ -154,11 +202,23 @@ void MobManager::update(Room* currentRoom, Player* player, ProjectileManager* pr
             case MobType::BOSS:
                 updateBoss(mob, currentRoom, player, projectileManager);
                 break;
+            case MobType::BOSS_PIKE:
+                updatePikeBoss(mob, currentRoom, player, projectileManager);
+                break;
+            case MobType::BOSS_LOCKKEEPER:
+                updateLockKeeperBoss(mob, currentRoom, player, projectileManager);
+                break;
+            case MobType::BOSS_NANNY:
+                updateNannyBoss(mob, currentRoom, player, projectileManager);
+                break;
             default:
                 updateDuck(mob, currentRoom, player);
                 break;
         }
     }
+    
+    // Apply repulsion between mobs so they don't overlap
+    applyMobRepulsion();
     
     // Remove dead mobs
     mobs.erase(
@@ -365,6 +425,300 @@ void MobManager::updateBoss(MobData& mob, Room* room, Player* player, Projectile
         }
         
         mob.actionCooldown = 120 + rand() % 60;  // Longer cooldown for boss
+    }
+}
+
+void MobManager::updatePikeBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
+    /*
+     * PIKE BOSS - Level 1
+     * 
+     * A giant pike fish that swims around the arena.
+     * 
+     * ATTACKS:
+     * 1. Circling - Swims in circles around player, occasionally lunging
+     * 2. Charge - Fast dash across the room
+     * 3. Tail Sweep - Spins and sweeps tail in an arc, spawns projectiles
+     * 4. Leap - Jumps out of water, crashes down creating splash damage
+     * 5. Submerge - Hides underwater, only ripples visible, then emerges to attack
+     * 
+     * PHASES:
+     * Phase 1 (100-60% HP): Circling + occasional Charge
+     * Phase 2 (60-30% HP): Adds Tail Sweep, faster attacks
+     * Phase 3 (<30% HP): Adds Leap attack, very aggressive
+     */
+    
+    float dx = player->position.x - mob.position.x;
+    float dy = player->position.y - mob.position.y;
+    float distToPlayer = std::sqrt(dx * dx + dy * dy);
+    
+    float roomWidth = static_cast<float>(room->getWidth());
+    float roomHeight = static_cast<float>(room->getHeight());
+    
+    // Update phase based on health
+    float healthPercent = mob.health / mob.maxHealth;
+    if (healthPercent <= 0.3f) {
+        mob.phase = 3;
+    } else if (healthPercent <= 0.6f) {
+        mob.phase = 2;
+    } else {
+        mob.phase = 1;
+    }
+    
+    // Update facing direction
+    mob.facingRight = dx > 0;
+    
+    switch (mob.state) {
+        case MobState::PIKE_CIRCLING: {
+            // Circle around the player at a set distance
+            float circleRadius = 4.0f;
+            float circleSpeed = 0.02f + (mob.phase - 1) * 0.008f;  // Faster in later phases
+            
+            mob.circleAngle += circleSpeed;
+            if (mob.circleAngle > 6.28f) mob.circleAngle -= 6.28f;
+            
+            // Target position on circle around player
+            float targetX = player->position.x + std::cos(mob.circleAngle) * circleRadius;
+            float targetY = player->position.y + std::sin(mob.circleAngle) * circleRadius;
+            
+            // Clamp to room bounds
+            targetX = std::max(2.0f, std::min(targetX, roomWidth - 3.0f));
+            targetY = std::max(2.0f, std::min(targetY, roomHeight - 3.0f));
+            
+            // Move towards target position
+            float tdx = targetX - mob.position.x;
+            float tdy = targetY - mob.position.y;
+            float tdist = std::sqrt(tdx * tdx + tdy * tdy);
+            
+            if (tdist > 0.1f) {
+                mob.position.x += (tdx / tdist) * mob.speed;
+                mob.position.y += (tdy / tdist) * mob.speed;
+            }
+            
+            // Update rotation to face movement direction
+            mob.rotation = std::atan2(tdy, tdx);
+            
+            // Decide next attack when cooldown is ready
+            if (mob.actionCooldown <= 0) {
+                int attackRoll = rand() % 100;
+                
+                if (mob.phase >= 3 && attackRoll < 20) {
+                    // Phase 3: Leap attack
+                    mob.state = MobState::PIKE_LEAP;
+                    mob.stateTimer = 0;
+                    mob.chargeTarget = player->position;
+                } else if (mob.phase >= 2 && attackRoll < 45) {
+                    // Phase 2+: Tail sweep
+                    mob.state = MobState::PIKE_TAIL_SWEEP;
+                    mob.stateTimer = 0;
+                    mob.tailSweepAngle = std::atan2(dy, dx);
+                } else if (attackRoll < 70) {
+                    // Charge attack
+                    mob.state = MobState::PIKE_CHARGING;
+                    mob.stateTimer = 0;
+                    mob.chargeTarget = player->position;
+                    mob.chargeSpeed = 0.12f + mob.phase * 0.03f;
+                } else {
+                    // Submerge and ambush
+                    mob.state = MobState::PIKE_SUBMERGED;
+                    mob.stateTimer = 0;
+                    mob.submerged = true;
+                }
+                
+                mob.actionCooldown = 90 - mob.phase * 15;  // Faster attacks in later phases
+            }
+            break;
+        }
+        
+        case MobState::PIKE_CHARGING: {
+            // Fast charge towards target position
+            float cdx = mob.chargeTarget.x - mob.position.x;
+            float cdy = mob.chargeTarget.y - mob.position.y;
+            float cdist = std::sqrt(cdx * cdx + cdy * cdy);
+            
+            mob.rotation = std::atan2(cdy, cdx);
+            
+            if (cdist > 0.5f && mob.stateTimer < 60) {
+                // Still charging
+                mob.position.x += (cdx / cdist) * mob.chargeSpeed;
+                mob.position.y += (cdy / cdist) * mob.chargeSpeed;
+                
+                // Clamp to room
+                mob.position.x = std::max(1.0f, std::min(mob.position.x, roomWidth - 2.0f));
+                mob.position.y = std::max(1.0f, std::min(mob.position.y, roomHeight - 2.0f));
+            } else {
+                // Charge complete, brief pause then return to circling
+                if (mob.stateTimer > 80) {
+                    mob.state = MobState::PIKE_CIRCLING;
+                    mob.stateTimer = 0;
+                }
+            }
+            break;
+        }
+        
+        case MobState::PIKE_TAIL_SWEEP: {
+            // Spin and create arc of projectiles
+            if (mob.stateTimer < 20) {
+                // Wind up - slight movement back
+                mob.rotation += 0.1f;
+            } else if (mob.stateTimer == 20) {
+                // Release projectiles in an arc
+                int numProjectiles = 5 + mob.phase;
+                float arcSpread = 1.2f;  // About 70 degrees each side
+                
+                for (int i = 0; i < numProjectiles; i++) {
+                    float angle = mob.tailSweepAngle - arcSpread + (arcSpread * 2.0f * i / (numProjectiles - 1));
+                    
+                    Tyra::Vec2 projPos = mob.position;
+                    projPos.x += 1.0f;  // Offset from center
+                    projPos.y += 0.5f;
+                    
+                    Tyra::Vec2 projVel;
+                    projVel.x = std::cos(angle) * 0.05f;
+                    projVel.y = std::sin(angle) * 0.05f;
+                    
+                    projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f);
+                }
+            } else if (mob.stateTimer > 50) {
+                // Return to circling
+                mob.state = MobState::PIKE_CIRCLING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::PIKE_LEAP: {
+            // Jump out of water and crash down
+            if (mob.stateTimer < 30) {
+                // Rising up (could add visual scaling here)
+                mob.submerged = false;
+            } else if (mob.stateTimer < 60) {
+                // In the air - move towards player
+                float ldx = mob.chargeTarget.x - mob.position.x;
+                float ldy = mob.chargeTarget.y - mob.position.y;
+                float ldist = std::sqrt(ldx * ldx + ldy * ldy);
+                
+                if (ldist > 0.1f) {
+                    mob.position.x += (ldx / ldist) * 0.08f;
+                    mob.position.y += (ldy / ldist) * 0.08f;
+                }
+            } else if (mob.stateTimer == 60) {
+                // Crash down - spawn splash projectiles in all directions
+                int numSplash = 8;
+                for (int i = 0; i < numSplash; i++) {
+                    float angle = (6.28f / numSplash) * i;
+                    
+                    Tyra::Vec2 projPos = mob.position;
+                    projPos.x += 1.0f;
+                    projPos.y += 0.5f;
+                    
+                    Tyra::Vec2 projVel;
+                    projVel.x = std::cos(angle) * 0.04f;
+                    projVel.y = std::sin(angle) * 0.04f;
+                    
+                    projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f);
+                }
+            } else if (mob.stateTimer > 90) {
+                // Recovery complete
+                mob.state = MobState::PIKE_CIRCLING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::PIKE_SUBMERGED: {
+            // Hidden underwater - slowly move towards player
+            mob.submerged = true;
+            
+            // Slow drift towards player
+            if (distToPlayer > 2.0f) {
+                mob.position.x += (dx / distToPlayer) * 0.015f;
+                mob.position.y += (dy / distToPlayer) * 0.015f;
+            }
+            
+            // After some time, burst out
+            if (mob.stateTimer > 90 + rand() % 30) {
+                mob.state = MobState::PIKE_EMERGING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::PIKE_EMERGING: {
+            // Burst out of water - quick attack
+            mob.submerged = false;
+            
+            if (mob.stateTimer < 5) {
+                // Brief pause
+            } else if (mob.stateTimer < 25) {
+                // Lunge at player
+                if (distToPlayer > 0.5f) {
+                    mob.position.x += (dx / distToPlayer) * 0.1f;
+                    mob.position.y += (dy / distToPlayer) * 0.1f;
+                }
+                mob.rotation = std::atan2(dy, dx);
+            } else if (mob.stateTimer > 50) {
+                // Return to circling
+                mob.state = MobState::PIKE_CIRCLING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        default:
+            mob.state = MobState::PIKE_CIRCLING;
+            break;
+    }
+}
+
+void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
+    // TODO: Level 2 boss - Lock Keeper
+    // For now, use generic boss behavior
+    updateBoss(mob, room, player, projectileManager);
+}
+
+void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
+    // TODO: Level 3 boss - Nanny
+    // For now, use generic boss behavior
+    updateBoss(mob, room, player, projectileManager);
+}
+
+void MobManager::applyMobRepulsion() {
+    const float repulsionStrength = 0.02f;  // How strongly mobs push apart
+    const float minDistance = 1.2f;          // Distance at which repulsion starts (in tiles)
+    
+    for (size_t i = 0; i < mobs.size(); i++) {
+        if (!mobs[i].active || mobs[i].submerged) continue;
+        
+        for (size_t j = i + 1; j < mobs.size(); j++) {
+            if (!mobs[j].active || mobs[j].submerged) continue;
+            
+            // Calculate distance between mob centers
+            float dx = mobs[j].position.x - mobs[i].position.x;
+            float dy = mobs[j].position.y - mobs[i].position.y;
+            float distance = std::sqrt(dx * dx + dy * dy);
+            
+            // Calculate combined radius (in tiles)
+            float radiusI = (mobs[i].size.x / Constants::TILE_SIZE) * 0.5f;
+            float radiusJ = (mobs[j].size.x / Constants::TILE_SIZE) * 0.5f;
+            float combinedRadius = radiusI + radiusJ;
+            
+            // Apply repulsion if too close
+            if (distance < combinedRadius * minDistance && distance > 0.01f) {
+                // Normalize direction
+                float nx = dx / distance;
+                float ny = dy / distance;
+                
+                // Calculate overlap amount (stronger repulsion when closer)
+                float overlap = (combinedRadius * minDistance) - distance;
+                float force = overlap * repulsionStrength;
+                
+                // Apply force to both mobs (push apart)
+                mobs[i].position.x -= nx * force;
+                mobs[i].position.y -= ny * force;
+                mobs[j].position.x += nx * force;
+                mobs[j].position.y += ny * force;
+            }
+        }
     }
 }
 

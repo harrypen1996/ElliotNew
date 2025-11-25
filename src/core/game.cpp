@@ -73,23 +73,45 @@ void Game::initLevel(int levelNumber) {
     // Create player
     player = std::make_unique<Player>(&engine->pad);
     
-    // Get the start room and position player in center
-    Room* startRoom = currentLevel->getStartRoom();
-    if (startRoom) {
-        player->position.x = startRoom->getWidth() / 2.0f - 0.5f;
-        player->position.y = startRoom->getHeight() / 2.0f - 0.5f;
-        startRoom->setVisited(true);  // Mark start room as visited
+    // Cheat: Skip to boss room
+    Room* spawnRoom = nullptr;
+    if (Constants::Cheats::SKIP_TO_BOSS) {
+        spawnRoom = currentLevel->getBossRoom();
+        if (spawnRoom) {
+            int bossX, bossY;
+            currentLevel->getBossRoomGridPos(bossX, bossY);
+            currentLevel->setCurrentRoom(bossX, bossY);
+            TYRA_LOG("CHEAT: Skipping to boss room at (", bossX, ", ", bossY, ")");
+        }
+    }
+    
+    // Fall back to start room if no boss room or cheat disabled
+    if (!spawnRoom) {
+        spawnRoom = currentLevel->getStartRoom();
+    }
+    
+    if (spawnRoom) {
+        player->position.x = spawnRoom->getWidth() / 2.0f - 0.5f;
+        player->position.y = spawnRoom->getHeight() / 2.0f - 0.5f;
+        spawnRoom->setVisited(true);
         
         TYRA_LOG("Player spawned at (", player->position.x, ", ", player->position.y, ")");
+        
+        // Spawn mobs for the room (including boss if boss room)
+        if (Constants::Cheats::SKIP_TO_BOSS && spawnRoom->getType() == RoomType::BOSS) {
+            mobManager.spawnMobsForRoom(spawnRoom, currentLevelNumber);
+        }
     }
     
     // Clear managers for new level
     projectileManager.clear();
-    mobManager.clear();
+    if (!Constants::Cheats::SKIP_TO_BOSS) {
+        mobManager.clear();
+    }
     
     // Setup camera
     camera.follow(player->position);
-    camera.clampToRoom(startRoom);
+    camera.clampToRoom(spawnRoom);
     
     TYRA_LOG("CanalUx: Level ", levelNumber, " ready");
 }
@@ -325,7 +347,15 @@ void Game::setState(GameState newState) {
 
 void Game::startNewGame() {
     TYRA_LOG("CanalUx: Starting new game");
-    initLevel(1);
+    
+    // Cheat: Start at specific level
+    int startLevel = 1;
+    if (Constants::Cheats::START_LEVEL > 0 && Constants::Cheats::START_LEVEL <= Constants::TOTAL_LEVELS) {
+        startLevel = Constants::Cheats::START_LEVEL;
+        TYRA_LOG("CHEAT: Starting at level ", startLevel);
+    }
+    
+    initLevel(startLevel);
     setState(GameState::PLAYING);
 }
 

@@ -33,6 +33,8 @@ public:
     const Room* getRoom(int gridX, int gridY) const;
     Room* getCurrentRoom() { return currentRoom; }
     Room* getStartRoom();
+    Room* getBossRoom();
+    void getBossRoomGridPos(int& outX, int& outY);
     
     // Navigation
     void setCurrentRoom(int gridX, int gridY);

@@ -37,6 +37,7 @@ public:
     // Submerge mechanic
     void trySubmerge();
     bool canSubmerge() const;
+    bool isSubmerged() const { return submerged; }
     float getSubmergeTimeRemaining() const;
     float getSubmergeCooldownRemaining() const;
 
@@ -71,6 +72,7 @@ private:
     // State
     Direction facing;
     bool shooting;
+    bool submerged;
 
     // Base values (can be modified by items)
     float baseSpeed;

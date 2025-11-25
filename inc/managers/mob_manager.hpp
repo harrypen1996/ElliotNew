@@ -22,7 +22,12 @@ enum class MobType {
     SWAN = 1,    // Shooter - keeps distance and shoots feathers
     FROG = 2,    // Jumper - hops around, submerges between jumps
     FISH = 3,    // Fast swimmer - quick but low health (future)
-    BOSS = 10    // Boss version (bigger, more health)
+    BOSS = 10,   // Generic boss (legacy)
+    
+    // Specific bosses per level
+    BOSS_PIKE = 11,        // Level 1 - Giant pike fish
+    BOSS_LOCKKEEPER = 12,  // Level 2 - The Lock Keeper
+    BOSS_NANNY = 13        // Level 3 - Nanny (grandma)
 };
 
 // Mob behavior states
@@ -32,7 +37,15 @@ enum class MobState {
     ATTACKING,
     JUMPING,
     SUBMERGED,
-    SURFACING
+    SURFACING,
+    
+    // Pike-specific states
+    PIKE_CIRCLING,      // Swimming in circles around player
+    PIKE_CHARGING,      // Fast charge attack
+    PIKE_TAIL_SWEEP,    // Tail cleave attack
+    PIKE_LEAP,          // Leaps out of water, crashes down
+    PIKE_SUBMERGED,     // Hidden underwater, ripples visible
+    PIKE_EMERGING       // Bursting up from water
 };
 
 class MobManager {
@@ -74,9 +87,18 @@ public:
         // Frog specific
         Tyra::Vec2 jumpTarget;
         
+        // Pike boss specific
+        float circleAngle;       // Current angle when circling player
+        float chargeSpeed;       // Speed during charge attack
+        Tyra::Vec2 chargeTarget; // Where pike is charging to
+        int attackPattern;       // Which attack in the pattern
+        int phase;               // Boss phase (changes behavior at health thresholds)
+        float tailSweepAngle;    // Angle for tail sweep attack
+        
         // For rendering
         bool facingRight;
         bool submerged;
+        float rotation;          // For pike rotation during attacks
     };
     
     const std::vector<MobData>& getMobs() const { return mobs; }
@@ -88,6 +110,12 @@ private:
     void updateFrog(MobData& mob, Room* room, Player* player);
     void updateBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager);
     
+    // Boss-specific updates
+    void updatePikeBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager);
+    void updateLockKeeperBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager);
+    void updateNannyBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager);
+    
+    void applyMobRepulsion();
     bool canMoveTo(MobData& mob, float x, float y, Room* room);
     
     std::vector<MobData> mobs;

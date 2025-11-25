@@ -44,6 +44,10 @@ constexpr int LEVEL_GRID_HEIGHT = 8;
 constexpr int MIN_ROOMS_PER_LEVEL = 6;
 constexpr int MAX_ROOMS_PER_LEVEL = 12;
 
+// Boss room sizes (larger arena for boss fights)
+constexpr int BOSS_ROOM_WIDTH = 24;   // Wider arena
+constexpr int BOSS_ROOM_HEIGHT = 20;  // Taller arena
+
 // Game progression
 constexpr int TOTAL_LEVELS = 3;  // 3 canal sections to escape
 
@@ -68,6 +72,35 @@ namespace Sprites {
     constexpr int FISH = 2;
     constexpr int FROG = 3;
     // Add more as needed
+}
+
+// ============================================
+// DEBUG / CHEAT FLAGS - Set to false for release!
+// ============================================
+namespace Cheats {
+    // God mode - player can't take damage
+    constexpr bool GOD_MODE = true;
+    
+    // Massive damage - one-shot everything
+    constexpr bool ONE_HIT_KILLS = false;
+    
+    // Start at specific level (0 = normal, 1-3 = skip to that level)
+    constexpr int START_LEVEL = 1;
+    
+    // Rooms start cleared (no enemies, doors open)
+    constexpr bool ROOMS_PRE_CLEARED = false;
+    
+    // Skip straight to boss room
+    constexpr bool SKIP_TO_BOSS = true;
+    
+    // Infinite submerge (no cooldown/duration limit)
+    constexpr bool INFINITE_SUBMERGE = false;
+    
+    // Show debug info on screen (positions, health, etc)
+    constexpr bool SHOW_DEBUG_INFO = false;
+    
+    // Fast player speed multiplier
+    constexpr float SPEED_MULTIPLIER = 1.0f;  // Set to 2.0f for double speed
 }
 
 }  // namespace Constants
