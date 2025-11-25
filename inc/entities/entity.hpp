@@ -1,39 +1,68 @@
+/*
+ * CanalUx - Base Entity Class
+ * Foundation for all game objects with position, velocity, and collision
+ */
+
 #pragma once
+
 #include <tyra>
-#include <memory>
+#include "core/constants.hpp"
 
-namespace Elliot {
+// Forward declaration
+namespace CanalUx {
+    class Room;
+}
 
+namespace CanalUx {
+
+/**
+ * Base class for all entities in the game (player, mobs, projectiles, obstacles)
+ * Provides common functionality for physics, collision, and rendering
+ */
 class Entity {
- public:
-  // Explicitly use Tyra::Engine
-  Entity(Tyra::Engine* t_engine) : engine(t_engine) {
-      position = Tyra::Vec2(0.0f, 0.0f);
-      isSubmerged = false;
-  }
-  virtual ~Entity() {}
+public:
+    Entity();
+    Entity(Tyra::Vec2 pos, Tyra::Vec2 sz);
+    virtual ~Entity();
 
-  virtual void update() = 0;
-  
-  virtual void render() {
-      if (sprite) {
-          sprite->position = position;
-          sprite->color.a = isSubmerged ? 64.0F : 128.0F;
-          engine->renderer.renderer2D.render(sprite.get());
-      }
-  }
+    // Core update - called every frame
+    virtual void update(float deltaTime) = 0;
 
-  // Explicitly use Tyra::Vec2
-  Tyra::Vec2 getPosition() const { return position; }
+    // Physics
+    void applyVelocity();
+    void applyDrag(float dragCoefficient = Constants::DRAG_COEFFICIENT);
+    void clampVelocity(float maxVel = Constants::MAX_VELOCITY);
 
- protected:
-  // Explicitly use Tyra::Engine
-  Tyra::Engine* engine;
-  // Explicitly use Tyra::Sprite
-  std::unique_ptr<Tyra::Sprite> sprite;
-  // Explicitly use Tyra::Vec2
-  Tyra::Vec2 position;
-  bool isSubmerged;
+    // Collision detection
+    bool checkCollision(const Entity& other) const;
+    bool checkTileCollision(const Room* room, float offsetX, float offsetY) const;
+    void resolveCollisionX(const Room* room, float oldX);
+    void resolveCollisionY(const Room* room, float oldY);
+
+    // Bounding box helpers
+    float getLeft() const { return position.x; }
+    float getRight() const { return position.x + size.x / Constants::TILE_SIZE; }
+    float getTop() const { return position.y; }
+    float getBottom() const { return position.y + size.y / Constants::TILE_SIZE; }
+    Tyra::Vec2 getCenter() const;
+
+    // State
+    bool isActive() const { return active; }
+    void setActive(bool value) { active = value; }
+    bool isSubmerged() const { return submerged; }
+    void setSubmerged(bool value) { submerged = value; }
+
+    // Position and movement
+    Tyra::Vec2 position;
+    Tyra::Vec2 velocity;
+    Tyra::Vec2 size;
+
+protected:
+    bool active;      // If false, entity is marked for removal
+    bool submerged;   // Underwater (for diving mechanic)
+
+    // Helper to check if a specific tile position is solid
+    bool isTileSolid(const Room* room, int tileX, int tileY) const;
 };
 
-}
+}  // namespace CanalUx

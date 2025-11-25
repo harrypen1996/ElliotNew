@@ -1,16 +1,15 @@
+/*
+ * CanalUx - A canal-themed roguelike for PlayStation 2
+ * Built with Tyra Game Engine
+ */
+
 #include <tyra>
-#include "elliot_game.hpp"
+#include "core/game.hpp"
 
 int main() {
-  Tyra::EngineOptions options;
-  
-  // Set to true if you want to see logs on your PC while running on PS2
-  options.loadUsbDriver = false; 
-  options.writeLogsToFile = false;
-
-  Tyra::Engine engine(options);
-
-  Elliot::ElliotGame game(&engine);
-  engine.run(&game);
-  return 0;
+    Tyra::EngineOptions options;
+    Tyra::Engine engine(options);
+    CanalUx::Game game(&engine);
+    engine.run(&game);
+    return 0;
 }
