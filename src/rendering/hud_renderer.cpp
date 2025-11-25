@@ -25,13 +25,13 @@ void HUDRenderer::init(Tyra::TextureRepository* textureRepo, Tyra::Renderer2D* r
     heartSprite.size = Tyra::Vec2(32.0f, 32.0f);
     heartsTexture->addLink(heartSprite.id);
     
-    // Load GUI sheet (bottom-right quadrant) for minimap icons
-    filepath = Tyra::FileUtils::fromCwd("gui_br.png");
-    auto* guiTexture = textureRepo->add(filepath);
+    // Load simple white pixel texture for colored rectangles
+    filepath = Tyra::FileUtils::fromCwd("pixel.png");
+    auto* pixelTexture = textureRepo->add(filepath);
     
-    minimapSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    minimapSprite.size = Tyra::Vec2(48.0f, 48.0f);
-    guiTexture->addLink(minimapSprite.id);
+    minimapSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    minimapSprite.size = Tyra::Vec2(8.0f, 8.0f);
+    pixelTexture->addLink(minimapSprite.id);
     
     // Load font
     font.load(textureRepo, renderer2D);
@@ -117,18 +117,7 @@ void HUDRenderer::renderMinimap(Tyra::Renderer2D* renderer, const Level* level) 
     int currentX = level->getCurrentGridX();
     int currentY = level->getCurrentGridY();
     
-    // GUI sprite sheet offsets (512x512 gui_br.png - bottom-right quadrant)
-    // Icons are roughly 48x48, positioned in columns around x=144 and x=192
-    // Row positions: star ~240, green square ~288, blue orb ~336, heart ~384, purple ~432
-    
-    Tyra::Vec2 greenSquareOffset(192.0f, 288.0f);   // Green square
-    Tyra::Vec2 redHeartOffset(144.0f, 384.0f);      // Red heart
-    Tyra::Vec2 yellowStarOffset(144.0f, 240.0f);    // Yellow star
-    Tyra::Vec2 blueOrbOffset(144.0f, 336.0f);       // Blue orb
-    Tyra::Vec2 goldCoinOffset(192.0f, 384.0f);      // Gold $ coin
-    Tyra::Vec2 graySquareOffset(96.0f, 48.0f);      // Gray button (top area)
-    
-    // Draw visited rooms
+    // Draw visited rooms as colored rectangles
     for (int y = 0; y < gridHeight; y++) {
         for (int x = 0; x < gridWidth; x++) {
             const Room* room = level->getRoom(x, y);
@@ -139,51 +128,48 @@ void HUDRenderer::renderMinimap(Tyra::Renderer2D* renderer, const Level* level) 
             float drawX = mapStartX + x * (roomSize + roomSpacing);
             float drawY = mapStartY + y * (roomSize + roomSpacing);
             
-            // Choose sprite offset based on room type
-            Tyra::Vec2 spriteOffset = greenSquareOffset;
-            
+            // Choose color based on room type
+            Tyra::Color roomColor;
             switch (room->getType()) {
                 case RoomType::START:
-                    spriteOffset = blueOrbOffset;
+                    roomColor = Tyra::Color(100, 200, 100);  // Green
                     break;
                 case RoomType::BOSS:
-                    spriteOffset = redHeartOffset;
+                    roomColor = Tyra::Color(200, 50, 50);    // Red
                     break;
                 case RoomType::SHOP:
-                    spriteOffset = goldCoinOffset;
+                    roomColor = Tyra::Color(200, 200, 50);   // Yellow
                     break;
                 case RoomType::SPECIAL:
-                    spriteOffset = yellowStarOffset;
+                    roomColor = Tyra::Color(200, 100, 200);  // Purple
                     break;
                 default:
                     if (room->isCleared()) {
-                        spriteOffset = graySquareOffset;
+                        roomColor = Tyra::Color(150, 150, 150);  // Gray
                     } else {
-                        spriteOffset = greenSquareOffset;
+                        roomColor = Tyra::Color(100, 150, 200);  // Blue
                     }
                     break;
             }
             
-            // Draw current room indicator (brighter border) first if this is current room
+            // Draw current room with white border
             if (x == currentX && y == currentY) {
                 Tyra::Sprite borderSprite;
                 borderSprite.id = minimapSprite.id;
-                borderSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+                borderSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
                 borderSprite.size = Tyra::Vec2(roomSize + 4.0f, roomSize + 4.0f);
                 borderSprite.position = Tyra::Vec2(drawX - 2.0f, drawY - 2.0f);
-                borderSprite.offset = spriteOffset;
                 borderSprite.color = Tyra::Color(255, 255, 255);
                 renderer->render(borderSprite);
             }
             
-            // Draw room icon
+            // Draw room rectangle
             Tyra::Sprite roomSprite;
             roomSprite.id = minimapSprite.id;
-            roomSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+            roomSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
             roomSprite.size = Tyra::Vec2(roomSize, roomSize);
             roomSprite.position = Tyra::Vec2(drawX, drawY);
-            roomSprite.offset = spriteOffset;
-            
+            roomSprite.color = roomColor;
             renderer->render(roomSprite);
         }
     }

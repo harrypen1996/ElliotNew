@@ -35,7 +35,7 @@ private:
     void renderLevelIndicator(Tyra::Renderer2D* renderer, const Level* level);
 
     Tyra::Sprite heartSprite;    // Heart sprites for health
-    Tyra::Sprite minimapSprite;  // Minimap room squares
+    Tyra::Sprite minimapSprite;  // Minimap room rectangles (uses pixel texture)
     
     Font font;  // Text rendering
     
