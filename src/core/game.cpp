@@ -9,39 +9,25 @@ namespace CanalUx {
 Game::Game(Tyra::Engine* t_engine)
     : engine(t_engine),
       state(GameState::MENU),
-      currentLevelNumber(1),
-      cameraX(0.0f),
-      cameraY(0.0f),
-      screenWidth(Constants::SCREEN_WIDTH),
-      screenHeight(Constants::SCREEN_HEIGHT),
-      visibleTilesX(0),
-      visibleTilesY(0) {
+      currentLevelNumber(1) {
 }
 
 Game::~Game() {
-    cleanup();
+    cleanupRenderers();
 }
 
 void Game::init() {
     TYRA_LOG("CanalUx: Initializing game...");
     
-    // Set background color (dark water-ish blue)
+    // Set background color
     engine->renderer.setClearScreenColor(Tyra::Color(32.0f, 48.0f, 64.0f));
 
-    // Get actual screen dimensions
+    // Initialize camera with screen size
     auto& screenSettings = engine->renderer.core.getSettings();
-    screenWidth = screenSettings.getWidth();
-    screenHeight = screenSettings.getHeight();
-    
-    // Calculate visible tiles
-    visibleTilesX = static_cast<int>(screenWidth / Constants::TILE_SIZE) + 2;
-    visibleTilesY = static_cast<int>(screenHeight / Constants::TILE_SIZE) + 2;
+    camera.setScreenSize(screenSettings.getWidth(), screenSettings.getHeight());
 
-    TYRA_LOG("Screen size: ", screenWidth, "x", screenHeight);
-    TYRA_LOG("Visible tiles: ", visibleTilesX, "x", visibleTilesY);
-
-    // Load all game assets
-    loadAssets();
+    // Initialize all renderers
+    initRenderers();
 
     // Start the game
     startNewGame();
@@ -55,40 +41,24 @@ void Game::loop() {
     render();
 }
 
-void Game::loadAssets() {
-    TYRA_LOG("CanalUx: Loading assets...");
+void Game::initRenderers() {
+    auto& textureRepo = engine->renderer.getTextureRepository();
     
-    auto& renderer = engine->renderer;
-    auto& textureRepository = renderer.getTextureRepository();
+    roomRenderer.init(&textureRepo);
+    entityRenderer.init(&textureRepo);
+    hudRenderer.init(&textureRepo);
     
-    // Load terrain tileset
-    auto filepath = Tyra::FileUtils::fromCwd("all2.png");
-    auto* texture = textureRepository.add(filepath);
+    TYRA_LOG("CanalUx: Renderers initialized");
+}
+
+void Game::cleanupRenderers() {
+    auto& textureRepo = engine->renderer.getTextureRepository();
     
-    // Set up terrain sprite for tile rendering
-    terrainSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    terrainSprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
-    texture->addLink(terrainSprite.id);
+    roomRenderer.cleanup(&textureRepo);
+    entityRenderer.cleanup(&textureRepo);
+    hudRenderer.cleanup(&textureRepo);
     
-    // Load player texture
-    filepath = Tyra::FileUtils::fromCwd("elliot.png");
-    auto* playerTexture = textureRepository.add(filepath);
-    
-    // Set up player sprite
-    playerSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
-    playerSprite.size = Tyra::Vec2(Constants::PLAYER_SIZE, Constants::PLAYER_SIZE);
-    playerTexture->addLink(playerSprite.id);
-    
-    // Load projectile texture (items sheet)
-    filepath = Tyra::FileUtils::fromCwd("items_sheet.png");
-    auto* projectileTexture = textureRepository.add(filepath);
-    
-    // Set up projectile sprite
-    projectileSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    projectileSprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
-    projectileTexture->addLink(projectileSprite.id);
-    
-    TYRA_LOG("CanalUx: Assets loaded");
+    TYRA_LOG("CanalUx: Renderers cleaned up");
 }
 
 void Game::initLevel(int levelNumber) {
@@ -106,45 +76,62 @@ void Game::initLevel(int levelNumber) {
     // Get the start room and position player in center
     Room* startRoom = currentLevel->getStartRoom();
     if (startRoom) {
-        // Position player in center of room
         player->position.x = startRoom->getWidth() / 2.0f - 0.5f;
         player->position.y = startRoom->getHeight() / 2.0f - 0.5f;
-        
-        // Center camera on player
-        cameraX = player->position.x + 0.5f;
-        cameraY = player->position.y + 0.5f;
+        startRoom->setVisited(true);  // Mark start room as visited
         
         TYRA_LOG("Player spawned at (", player->position.x, ", ", player->position.y, ")");
     }
     
+    // Clear managers for new level
+    projectileManager.clear();
+    mobManager.clear();
+    
+    // Setup camera
+    camera.follow(player->position);
+    camera.clampToRoom(startRoom);
+    
     TYRA_LOG("CanalUx: Level ", levelNumber, " ready");
 }
 
-void Game::cleanup() {
-    TYRA_LOG("CanalUx: Cleaning up...");
-    
-    // Free textures
-    engine->renderer.getTextureRepository().freeBySprite(terrainSprite);
-    engine->renderer.getTextureRepository().freeBySprite(playerSprite);
-    engine->renderer.getTextureRepository().freeBySprite(projectileSprite);
-    
-    TYRA_LOG("CanalUx: Cleanup complete");
-}
-
 void Game::handleInput() {
-    // Global input handling (pause, quit, etc.)
-    if (engine->pad.getPressed().Start) {
-        if (state == GameState::PLAYING) {
-            setState(GameState::PAUSED);
-        } else if (state == GameState::PAUSED) {
-            setState(GameState::PLAYING);
-        }
-    }
-
-    // Debug: Circle to reset level
-    if (engine->pad.getPressed().Circle) {
-        TYRA_LOG("CanalUx: Resetting level...");
-        initLevel(currentLevelNumber);
+    // Handle input based on game state
+    switch (state) {
+        case GameState::PLAYING:
+            if (engine->pad.getPressed().Start) {
+                setState(GameState::PAUSED);
+            }
+            // Debug: Circle to reset level
+            if (engine->pad.getPressed().Circle) {
+                TYRA_LOG("CanalUx: Resetting level...");
+                initLevel(currentLevelNumber);
+            }
+            break;
+            
+        case GameState::PAUSED:
+            if (engine->pad.getPressed().Start) {
+                setState(GameState::PLAYING);
+            }
+            break;
+            
+        case GameState::GAME_OVER:
+            // Press Cross to restart from level 1
+            if (engine->pad.getPressed().Cross) {
+                TYRA_LOG("CanalUx: Restarting game after death...");
+                startNewGame();
+            }
+            break;
+            
+        case GameState::VICTORY:
+            // Press Cross to start a new game
+            if (engine->pad.getPressed().Cross) {
+                TYRA_LOG("CanalUx: Starting new game after victory...");
+                startNewGame();
+            }
+            break;
+            
+        default:
+            break;
     }
 }
 
@@ -153,94 +140,121 @@ void Game::update() {
         return;
     }
 
-    // Get current room
     Room* room = currentLevel->getCurrentRoom();
     if (!room || !player) return;
     
-    // Update player (with projectile manager for shooting)
+    // Update player
     player->update(room, &projectileManager);
     
     // Update projectiles
     projectileManager.update(room);
     
-    // Check for room transitions
-    int currentGridX = currentLevel->getCurrentGridX();
-    int currentGridY = currentLevel->getCurrentGridY();
+    // Update mobs
+    mobManager.update(room, player.get(), &projectileManager);
+    
+    // Check collisions
+    collisionManager.checkCollisions(player.get(), &mobManager, &projectileManager, room);
+    
+    // Check if room is cleared
+    if (mobManager.isRoomCleared() && !room->isCleared()) {
+        room->completeClear();
+        TYRA_LOG("Room cleared!");
+        
+        // Check if this was the boss room
+        if (room->getType() == RoomType::BOSS) {
+            onBossDefeated();
+        }
+    }
+    
+    // Check room transitions
+    checkRoomTransitions();
+    
+    // Update camera
+    camera.follow(player->position);
+    camera.clampToRoom(currentLevel->getCurrentRoom());
+    
+    // Check player death
+    if (player->getStats().isDead()) {
+        onPlayerDeath();
+    }
+}
+
+void Game::checkRoomTransitions() {
+    Room* room = currentLevel->getCurrentRoom();
+    if (!room || !player) return;
+    
+    int gridX = currentLevel->getCurrentGridX();
+    int gridY = currentLevel->getCurrentGridY();
     bool roomChanged = false;
     
     // Left exit
     if (player->position.x < 0.0f) {
-        Room* nextRoom = currentLevel->getRoom(currentGridX - 1, currentGridY);
+        Room* nextRoom = currentLevel->getRoom(gridX - 1, gridY);
         if (nextRoom && nextRoom->exists()) {
-            currentLevel->setCurrentRoom(currentGridX - 1, currentGridY);
+            currentLevel->setCurrentRoom(gridX - 1, gridY);
             player->position.x = nextRoom->getWidth() - 2.0f;
             player->position.y = nextRoom->getHeight() / 2.0f - 0.5f;
             roomChanged = true;
-            TYRA_LOG("Moved to room (", currentGridX - 1, ", ", currentGridY, ")");
+            TYRA_LOG("Moved to room (", gridX - 1, ", ", gridY, ")");
         } else {
             player->position.x = 0.0f;
         }
     }
     // Right exit
     else if (player->position.x > room->getWidth() - 1.0f) {
-        Room* nextRoom = currentLevel->getRoom(currentGridX + 1, currentGridY);
+        Room* nextRoom = currentLevel->getRoom(gridX + 1, gridY);
         if (nextRoom && nextRoom->exists()) {
-            currentLevel->setCurrentRoom(currentGridX + 1, currentGridY);
+            currentLevel->setCurrentRoom(gridX + 1, gridY);
             player->position.x = 1.0f;
             player->position.y = nextRoom->getHeight() / 2.0f - 0.5f;
             roomChanged = true;
-            TYRA_LOG("Moved to room (", currentGridX + 1, ", ", currentGridY, ")");
+            TYRA_LOG("Moved to room (", gridX + 1, ", ", gridY, ")");
         } else {
             player->position.x = room->getWidth() - 1.0f;
         }
     }
     // Top exit
     else if (player->position.y < 0.0f) {
-        Room* nextRoom = currentLevel->getRoom(currentGridX, currentGridY - 1);
+        Room* nextRoom = currentLevel->getRoom(gridX, gridY - 1);
         if (nextRoom && nextRoom->exists()) {
-            currentLevel->setCurrentRoom(currentGridX, currentGridY - 1);
+            currentLevel->setCurrentRoom(gridX, gridY - 1);
             player->position.x = nextRoom->getWidth() / 2.0f - 0.5f;
             player->position.y = nextRoom->getHeight() - 2.0f;
             roomChanged = true;
-            TYRA_LOG("Moved to room (", currentGridX, ", ", currentGridY - 1, ")");
+            TYRA_LOG("Moved to room (", gridX, ", ", gridY - 1, ")");
         } else {
             player->position.y = 0.0f;
         }
     }
     // Bottom exit
     else if (player->position.y > room->getHeight() - 1.0f) {
-        Room* nextRoom = currentLevel->getRoom(currentGridX, currentGridY + 1);
+        Room* nextRoom = currentLevel->getRoom(gridX, gridY + 1);
         if (nextRoom && nextRoom->exists()) {
-            currentLevel->setCurrentRoom(currentGridX, currentGridY + 1);
+            currentLevel->setCurrentRoom(gridX, gridY + 1);
             player->position.x = nextRoom->getWidth() / 2.0f - 0.5f;
             player->position.y = 1.0f;
             roomChanged = true;
-            TYRA_LOG("Moved to room (", currentGridX, ", ", currentGridY + 1, ")");
+            TYRA_LOG("Moved to room (", gridX, ", ", gridY + 1, ")");
         } else {
             player->position.y = room->getHeight() - 1.0f;
         }
     }
     
-    // Clear projectiles and update room pointer if changed
     if (roomChanged) {
-        projectileManager.clear();
-        room = currentLevel->getCurrentRoom();
+        onRoomEnter();
     }
+}
+
+void Game::onRoomEnter() {
+    // Clear projectiles when entering a new room
+    projectileManager.clear();
     
-    // Camera follows player
-    cameraX = player->position.x + 0.5f;
-    cameraY = player->position.y + 0.5f;
-    
-    // Clamp camera to room bounds
-    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
-    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
-    
-    if (cameraX < halfScreenTilesX) cameraX = halfScreenTilesX;
-    if (cameraY < halfScreenTilesY) cameraY = halfScreenTilesY;
-    if (cameraX > room->getWidth() - halfScreenTilesX) 
-        cameraX = room->getWidth() - halfScreenTilesX;
-    if (cameraY > room->getHeight() - halfScreenTilesY) 
-        cameraY = room->getHeight() - halfScreenTilesY;
+    // Mark room as visited and spawn mobs
+    Room* room = currentLevel->getCurrentRoom();
+    if (room) {
+        room->setVisited(true);
+        mobManager.spawnMobsForRoom(room, currentLevelNumber);
+    }
 }
 
 void Game::render() {
@@ -255,189 +269,53 @@ void Game::render() {
             
         case GameState::PLAYING:
         case GameState::PAUSED:
-            renderRoom();
-            renderProjectiles();
-            renderPlayer();
-            
-            if (state == GameState::PAUSED) {
-                // TODO: Render pause overlay
+            {
+                Room* room = currentLevel->getCurrentRoom();
+                
+                // Render room tiles
+                roomRenderer.render(&renderer.renderer2D, room, &camera);
+                
+                // Render entities (projectiles, mobs, player)
+                entityRenderer.render(&renderer.renderer2D, &camera, 
+                                      player.get(), &projectileManager, &mobManager);
+                
+                // Render HUD
+                hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
+                
+                if (state == GameState::PAUSED) {
+                    // TODO: Render pause overlay
+                }
             }
             break;
             
         case GameState::GAME_OVER:
-            // TODO: Render game over screen
+            {
+                // Still show the game world behind
+                Room* room = currentLevel->getCurrentRoom();
+                roomRenderer.render(&renderer.renderer2D, room, &camera);
+                entityRenderer.render(&renderer.renderer2D, &camera, 
+                                      player.get(), &projectileManager, &mobManager);
+                hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
+                
+                // TODO: Render "GAME OVER - Press X to restart" text overlay
+            }
             break;
             
         case GameState::VICTORY:
-            // TODO: Render victory screen
+            {
+                // Still show the game world behind
+                Room* room = currentLevel->getCurrentRoom();
+                roomRenderer.render(&renderer.renderer2D, room, &camera);
+                entityRenderer.render(&renderer.renderer2D, &camera, 
+                                      player.get(), &projectileManager, &mobManager);
+                hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
+                
+                // TODO: Render "VICTORY! - Press X to play again" text overlay
+            }
             break;
     }
 
     renderer.endFrame();
-}
-
-void Game::renderRoom() {
-    Room* room = currentLevel->getCurrentRoom();
-    if (!room) return;
-    
-    auto& renderer = engine->renderer;
-    
-    // Calculate the top-left visible tile based on camera position
-    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
-    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
-    
-    float offsetX = cameraX - halfScreenTilesX;
-    float offsetY = cameraY - halfScreenTilesY;
-    
-    // Clamp offsets
-    if (offsetX < 0) offsetX = 0;
-    if (offsetY < 0) offsetY = 0;
-    if (offsetX > room->getWidth() - visibleTilesX + 2) 
-        offsetX = room->getWidth() - visibleTilesX + 2;
-    if (offsetY > room->getHeight() - visibleTilesY + 2) 
-        offsetY = room->getHeight() - visibleTilesY + 2;
-    
-    // Sub-tile offset for smooth scrolling
-    float tileOffsetX = (offsetX - static_cast<int>(offsetX)) * Constants::TILE_SIZE;
-    float tileOffsetY = (offsetY - static_cast<int>(offsetY)) * Constants::TILE_SIZE;
-    
-    // Render visible tiles
-    for (int x = -1; x < visibleTilesX; x++) {
-        for (int y = -1; y < visibleTilesY; y++) {
-            int tileX = static_cast<int>(offsetX) + x;
-            int tileY = static_cast<int>(offsetY) + y;
-            
-            int screenX = x * Constants::TILE_SIZE - static_cast<int>(tileOffsetX);
-            int screenY = y * Constants::TILE_SIZE - static_cast<int>(tileOffsetY);
-            
-            // Render water layer (background)
-            int waterTile = room->getWaterTile(tileX, tileY);
-            if (waterTile > 0) {
-                renderer.renderer2D.render(getTileSprite(screenX, screenY, waterTile - 1));
-            }
-            
-            // Render land layer (walls/terrain)
-            int landTile = room->getLandTile(tileX, tileY);
-            if (landTile > 0) {
-                renderer.renderer2D.render(getTileSprite(screenX, screenY, landTile - 1));
-            }
-            
-            // Render scenery layer (obstacles, decorations)
-            int sceneryTile = room->getSceneryTile(tileX, tileY);
-            if (sceneryTile > 0) {
-                renderer.renderer2D.render(getTileSprite(screenX, screenY, sceneryTile - 1));
-            }
-        }
-    }
-}
-
-void Game::renderPlayer() {
-    if (!player) return;
-    
-    Room* room = currentLevel->getCurrentRoom();
-    if (!room) return;
-    
-    auto& renderer = engine->renderer;
-    
-    // Calculate camera offset (same as in renderRoom)
-    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
-    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
-    
-    float offsetX = cameraX - halfScreenTilesX;
-    float offsetY = cameraY - halfScreenTilesY;
-    
-    // Clamp offsets
-    if (offsetX < 0) offsetX = 0;
-    if (offsetY < 0) offsetY = 0;
-    if (offsetX > room->getWidth() - halfScreenTilesX * 2) 
-        offsetX = room->getWidth() - halfScreenTilesX * 2;
-    if (offsetY > room->getHeight() - halfScreenTilesY * 2) 
-        offsetY = room->getHeight() - halfScreenTilesY * 2;
-    
-    // Calculate player screen position
-    float screenX = (player->position.x - offsetX) * Constants::TILE_SIZE;
-    float screenY = (player->position.y - offsetY) * Constants::TILE_SIZE;
-    
-    // Update player sprite position
-    playerSprite.position = Tyra::Vec2(screenX, screenY);
-    
-    renderer.renderer2D.render(playerSprite);
-}
-
-void Game::renderProjectiles() {
-    Room* room = currentLevel->getCurrentRoom();
-    if (!room) return;
-    
-    auto& renderer = engine->renderer;
-    
-    // Calculate camera offset (same as in renderRoom)
-    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
-    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
-    
-    float offsetX = cameraX - halfScreenTilesX;
-    float offsetY = cameraY - halfScreenTilesY;
-    
-    // Clamp offsets
-    if (offsetX < 0) offsetX = 0;
-    if (offsetY < 0) offsetY = 0;
-    if (offsetX > room->getWidth() - halfScreenTilesX * 2) 
-        offsetX = room->getWidth() - halfScreenTilesX * 2;
-    if (offsetY > room->getHeight() - halfScreenTilesY * 2) 
-        offsetY = room->getHeight() - halfScreenTilesY * 2;
-    
-    // Render each projectile
-    for (const auto& projectile : projectileManager.getProjectiles()) {
-        if (!projectile.isActive()) continue;
-        
-        // Calculate screen position
-        float screenX = (projectile.position.x - offsetX) * Constants::TILE_SIZE;
-        float screenY = (projectile.position.y - offsetY) * Constants::TILE_SIZE;
-        
-        // Create sprite for this projectile
-        Tyra::Sprite sprite;
-        sprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
-        sprite.position = Tyra::Vec2(screenX, screenY);
-        sprite.id = projectileSprite.id;
-        sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-        
-        // Use a specific tile from the items sheet for projectile
-        // The items sheet is 256px wide with 16px tiles = 16 tiles per row
-        int tileIndex = 98;  // Adjust this to pick the right projectile sprite
-        int tilesPerRow = 256 / 16;
-        int column = tileIndex % tilesPerRow;
-        int row = tileIndex / tilesPerRow;
-        
-        sprite.offset = Tyra::Vec2(
-            static_cast<float>(column * 16),
-            static_cast<float>(row * 16)
-        );
-        
-        renderer.renderer2D.render(sprite);
-    }
-}
-
-Tyra::Sprite Game::getTileSprite(int screenX, int screenY, int tileIndex) {
-    Tyra::Sprite sprite;
-    sprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
-    sprite.position = Tyra::Vec2(static_cast<float>(screenX), static_cast<float>(screenY));
-    sprite.id = terrainSprite.id;
-    sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    
-    // Calculate offset in tileset (16 tiles per row in a 512px wide texture)
-    int tilesPerRow = 512 / Constants::TILE_SIZE;  // 16 tiles
-    int column = tileIndex % tilesPerRow;
-    int row = tileIndex / tilesPerRow;
-    
-    sprite.offset = Tyra::Vec2(
-        static_cast<float>(column * Constants::TILE_SIZE),
-        static_cast<float>(row * Constants::TILE_SIZE)
-    );
-    
-    return sprite;
-}
-
-void Game::renderTile(int screenX, int screenY, int tileIndex) {
-    engine->renderer.renderer2D.render(getTileSprite(screenX, screenY, tileIndex));
 }
 
 void Game::setState(GameState newState) {
@@ -447,22 +325,29 @@ void Game::setState(GameState newState) {
 
 void Game::startNewGame() {
     TYRA_LOG("CanalUx: Starting new game");
-    
     initLevel(1);
     setState(GameState::PLAYING);
 }
 
 void Game::advanceToNextLevel() {
     if (currentLevelNumber >= Constants::TOTAL_LEVELS) {
+        TYRA_LOG("CanalUx: All levels complete! Victory!");
         setState(GameState::VICTORY);
         return;
     }
     
+    TYRA_LOG("CanalUx: Advancing to level ", currentLevelNumber + 1);
     initLevel(currentLevelNumber + 1);
 }
 
 void Game::onPlayerDeath() {
+    TYRA_LOG("CanalUx: Player died! Press X to restart.");
     setState(GameState::GAME_OVER);
+}
+
+void Game::onBossDefeated() {
+    TYRA_LOG("CanalUx: Boss defeated!");
+    advanceToNextLevel();
 }
 
 void Game::onLevelComplete() {

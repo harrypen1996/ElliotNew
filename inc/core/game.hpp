@@ -1,23 +1,24 @@
 /*
  * CanalUx - Main Game Class
- * Handles game loop, state management, and coordinates all systems
+ * Coordinator that ties together all game systems
  */
 
 #pragma once
 
 #include <tyra>
 #include <memory>
-#include "constants.hpp"
+#include "core/constants.hpp"
+#include "core/camera.hpp"
 #include "world/level.hpp"
 #include "entities/player.hpp"
 #include "managers/projectile_manager.hpp"
+#include "managers/mob_manager.hpp"
+#include "managers/collision_manager.hpp"
+#include "rendering/room_renderer.hpp"
+#include "rendering/entity_renderer.hpp"
+#include "rendering/hud_renderer.hpp"
 
 namespace CanalUx {
-
-// Forward declarations
-class EntityManager;
-class TextureManager;
-class Camera;
 
 enum class GameState {
     MENU,
@@ -35,34 +36,32 @@ public:
     void init() override;
     void loop() override;
 
-    // Accessors for subsystems
+    // Accessors
     Tyra::Engine* getEngine() { return engine; }
     GameState getState() const { return state; }
-    int getCurrentLevel() const { return currentLevelNumber; }
+    int getCurrentLevelNumber() const { return currentLevelNumber; }
 
 private:
     // Lifecycle
-    void loadAssets();
+    void initRenderers();
+    void cleanupRenderers();
     void initLevel(int levelNumber);
-    void cleanup();
 
     // Game loop phases
     void handleInput();
     void update();
     void render();
 
-    // Rendering helpers
-    void renderRoom();
-    void renderPlayer();
-    void renderProjectiles();
-    void renderTile(int screenX, int screenY, int tileIndex);
-    Tyra::Sprite getTileSprite(int screenX, int screenY, int tileIndex);
+    // Room transition logic
+    void checkRoomTransitions();
+    void onRoomEnter();
 
     // State transitions
     void setState(GameState newState);
     void startNewGame();
     void advanceToNextLevel();
     void onPlayerDeath();
+    void onBossDefeated();
     void onLevelComplete();
 
     // Core engine reference
@@ -72,29 +71,24 @@ private:
     GameState state;
     int currentLevelNumber;
 
+    // Camera
+    Camera camera;
+
     // Level
     std::unique_ptr<Level> currentLevel;
 
-    // Player
+    // Entities
     std::unique_ptr<Player> player;
 
     // Managers
     ProjectileManager projectileManager;
+    MobManager mobManager;
+    CollisionManager collisionManager;
 
-    // Textures
-    Tyra::Sprite terrainSprite;      // Base sprite for terrain tileset
-    Tyra::Sprite playerSprite;       // Player sprite
-    Tyra::Sprite projectileSprite;   // Projectile sprite
-    
-    // Camera position (in tiles)
-    float cameraX;
-    float cameraY;
-
-    // Screen info
-    float screenWidth;
-    float screenHeight;
-    int visibleTilesX;
-    int visibleTilesY;
+    // Renderers
+    RoomRenderer roomRenderer;
+    EntityRenderer entityRenderer;
+    HUDRenderer hudRenderer;
 };
 
 }  // namespace CanalUx

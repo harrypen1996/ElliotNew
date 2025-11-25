@@ -47,6 +47,10 @@ public:
     // Level info
     int getLevelNumber() const { return levelNumber; }
     int getRoomCount() const { return roomCount; }
+    
+    // Grid access for minimap
+    int getGridWidth() const { return GRID_WIDTH; }
+    int getGridHeight() const { return GRID_HEIGHT; }
 
 private:
     // Generation phases

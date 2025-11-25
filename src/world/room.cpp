@@ -17,12 +17,12 @@ Room::Room()
       type(RoomType::NORMAL),
       roomExists(false),
       generated(false),
-      cleared(false) {
+      cleared(false),
+      visited(false) {
 }
 
 Room::~Room() {
 }
-
 
 void Room::generate(RoomGenerator* generator, int w, int h) {
     width = w;

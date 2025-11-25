@@ -18,9 +18,24 @@ Level::Level(int lvlNum)
       startGridX(GRID_WIDTH / 2),
       startGridY(GRID_HEIGHT / 2) {
     
-    // Seed RNG - in a real game you might want to allow seeded runs
+    // Static counter ensures each Level instance gets a different seed
+    static unsigned int instanceCounter = 0;
+    instanceCounter++;
+    
+    // Seed RNG using multiple sources for better randomness on PS2
     std::random_device rd;
-    rng.seed(rd());
+    unsigned int seed = rd();
+    
+    // Mix in time-based value for additional entropy
+    Tyra::Timer timer;
+    timer.prime();
+    seed ^= static_cast<unsigned int>(timer.getTimeDelta() * 1000);
+    seed ^= static_cast<unsigned int>(reinterpret_cast<uintptr_t>(&seed));
+    seed ^= (instanceCounter * 2654435761u);  // Multiply by golden ratio prime
+    
+    rng.seed(seed);
+    
+    TYRA_LOG("Level RNG seed: ", seed, " (instance ", instanceCounter, ")");
     
     // More rooms as levels progress
     int baseRooms = Constants::MIN_ROOMS_PER_LEVEL;
@@ -63,7 +78,7 @@ void Level::generateRoomLayout() {
     
     // Place start room in center - just mark it as existing, don't generate tiles yet
     grid[startGridY][startGridX].setType(RoomType::START);
-    grid[startGridY][startGridX].markExists();
+    grid[startGridY][startGridX].markExists();  // New method - just marks room as part of layout
     roomQueue.push_back(Tyra::Vec2(startGridX, startGridY));
     roomCount = 1;
     
@@ -101,7 +116,7 @@ void Level::generateRoomLayout() {
                 
                 // Random chance to skip (creates more interesting layouts)
                 std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
-                if (chanceDist(rng) < 0.3f) {
+                if (chanceDist(rng) < 0.3f) {  // Reduced skip chance
                     continue;
                 }
                 
@@ -126,7 +141,7 @@ void Level::generateRoomLayout() {
             roomQueue.push_back(newRoom);
         }
         
-        // Remove rooms that have been fully processed
+        // Remove rooms that have been fully processed (surrounded or no valid expansion)
         roomQueue.erase(
             std::remove_if(roomQueue.begin(), roomQueue.end(), 
                 [this](const Tyra::Vec2& pos) {
@@ -224,30 +239,30 @@ void Level::generateRoomTiles() {
             // Start room is already generated, skip it
             if (room.isGenerated()) continue;
             
-            // Determine room size
+            // Determine room size - all rooms must be at least screen size
             int width, height;
             
             switch (room.getType()) {
                 case RoomType::START:
                 case RoomType::BOSS:
-                    // Fixed larger size for important rooms
-                    width = 16;
-                    height = 14;
+                    // Fixed size for important rooms (screen size)
+                    width = Constants::ROOM_MIN_WIDTH;
+                    height = Constants::ROOM_MIN_HEIGHT;
                     break;
                 case RoomType::SHOP:
                 case RoomType::SPECIAL:
-                    // Medium fixed size
-                    width = 14;
-                    height = 12;
+                    // Fixed screen size for special rooms
+                    width = Constants::ROOM_MIN_WIDTH;
+                    height = Constants::ROOM_MIN_HEIGHT;
                     break;
                 default:
                     // Random size for normal rooms
                     // Make one dimension standard and vary the other
                     if (rng() % 2 == 0) {
                         width = widthDist(rng);
-                        height = 14;  // Standard height
+                        height = Constants::ROOM_MIN_HEIGHT;
                     } else {
-                        width = 16;   // Standard width
+                        width = Constants::ROOM_MIN_WIDTH;
                         height = heightDist(rng);
                     }
                     break;
@@ -276,7 +291,7 @@ bool Level::canPlaceRoom(int x, int y, int fromDirX, int fromDirY) const {
     if (!isValidGridPosition(x, y)) return false;
     
     // Must not already have a room
-    if (grid[y][x].isGenerated()) return false;
+    if (grid[y][x].exists()) return false;
     
     // Check adjacent cells (excluding the direction we came from)
     // We don't want rooms to cluster too much
@@ -290,7 +305,7 @@ bool Level::canPlaceRoom(int x, int y, int fromDirX, int fromDirY) const {
         int checkY = y + dir[1];
         
         if (roomExists(checkX, checkY)) {
-            // Would create a cluster - only allow with low probability
+            // Would create a cluster - don't allow
             return false;
         }
     }

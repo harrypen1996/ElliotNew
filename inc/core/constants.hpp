@@ -10,8 +10,12 @@ namespace Constants {
 
 // Display
 constexpr int TILE_SIZE = 32;
-constexpr float SCREEN_WIDTH = 640.0f;
-constexpr float SCREEN_HEIGHT = 448.0f;
+constexpr float SCREEN_WIDTH = 512.0f;   // 16 tiles
+constexpr float SCREEN_HEIGHT = 448.0f;  // 14 tiles
+
+// Screen size in tiles (for reference)
+constexpr int SCREEN_TILES_X = 16;
+constexpr int SCREEN_TILES_Y = 14;
 
 // Player defaults
 constexpr float PLAYER_SPEED = 1.0f;
@@ -30,11 +34,11 @@ constexpr float DRAG_COEFFICIENT = 0.2f;
 constexpr float VELOCITY_THRESHOLD = 0.01f;
 constexpr float MAX_VELOCITY = 0.5f;
 
-// Room generation
-constexpr int ROOM_MIN_WIDTH = 14;
-constexpr int ROOM_MAX_WIDTH = 18;
-constexpr int ROOM_MIN_HEIGHT = 12;
-constexpr int ROOM_MAX_HEIGHT = 16;
+// Room generation - minimum must be screen size (16x14 tiles)
+constexpr int ROOM_MIN_WIDTH = 16;   // Must be >= SCREEN_TILES_X
+constexpr int ROOM_MAX_WIDTH = 20;
+constexpr int ROOM_MIN_HEIGHT = 14;  // Must be >= SCREEN_TILES_Y
+constexpr int ROOM_MAX_HEIGHT = 18;
 constexpr int LEVEL_GRID_WIDTH = 9;
 constexpr int LEVEL_GRID_HEIGHT = 8;
 constexpr int MIN_ROOMS_PER_LEVEL = 6;

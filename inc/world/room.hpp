@@ -66,6 +66,8 @@ public:
     bool isGenerated() const { return generated; }
     bool isCleared() const { return cleared; }
     void setCleared(bool value) { cleared = value; }
+    bool isVisited() const { return visited; }
+    void setVisited(bool value) { visited = value; }
 
     // Spawn point for player entering this room
     Tyra::Vec2 getSpawnPoint(int entryDirection) const;
@@ -91,6 +93,7 @@ private:
     bool roomExists;  // Part of level layout
     bool generated;   // Tiles have been generated
     bool cleared;
+    bool visited;
 };
 
 }  // namespace CanalUx
