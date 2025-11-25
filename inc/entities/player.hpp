@@ -25,6 +25,9 @@ public:
 
     // Player-specific update with dependencies
     void update(Room* currentRoom, ProjectileManager* projectileManager);
+    
+    // Simplified update (no shooting)
+    void update(Room* currentRoom);
 
     // Combat
     void takeDamage(int amount);

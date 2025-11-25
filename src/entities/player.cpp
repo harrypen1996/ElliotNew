@@ -51,15 +51,30 @@ void Player::update(Room* currentRoom, ProjectileManager* projectileManager) {
     // Clamp velocity
     clampVelocity();
 
-    // Store old position for collision resolution
-    float oldX = position.x;
-    float oldY = position.y;
-
-    // Apply velocity
+    // Apply velocity and check collisions
+    // (checkRoomCollision handles position updates)
     position.x += velocity.x;
     position.y += velocity.y;
+    checkRoomCollision(currentRoom);
+}
 
-    // Check and resolve collisions
+void Player::update(Room* currentRoom) {
+    // Simplified update without shooting
+    handleMovementInput();
+    handleSubmergeInput();
+
+    // Update timers
+    float deltaTime = 16.67f;
+    updateSubmergeState(deltaTime);
+    updateInvincibility(deltaTime);
+
+    // Apply drag and clamp
+    applyDrag();
+    clampVelocity();
+
+    // Apply velocity and check collisions
+    position.x += velocity.x;
+    position.y += velocity.y;
     checkRoomCollision(currentRoom);
 }
 
@@ -195,72 +210,101 @@ void Player::checkRoomCollision(Room* currentRoom) {
     float sizeInTilesX = size.x / Constants::TILE_SIZE;
     float sizeInTilesY = size.y / Constants::TILE_SIZE;
 
-    // Horizontal collision
-    if (velocity.x <= 0) {
-        // Moving left
-        if (currentRoom->getLandTile(static_cast<int>(position.x), 
-                                      static_cast<int>(position.y)) != 0 ||
-            currentRoom->getLandTile(static_cast<int>(position.x), 
-                                      static_cast<int>(position.y + sizeInTilesY * 0.9f)) != 0) {
-            position.x = static_cast<int>(position.x) + 1;
-            velocity.x = 0;
+    // We need to check collision separately for X and Y movement
+    // First, undo the position change
+    position.x -= velocity.x;
+    position.y -= velocity.y;
+
+    // Store the original position
+    float origX = position.x;
+    float origY = position.y;
+
+    // --- Check X movement first ---
+    position.x += velocity.x;
+    
+    bool collidedX = false;
+    
+    if (velocity.x < 0) {
+        // Moving left - check left edge
+        int checkX = static_cast<int>(position.x);
+        int checkY1 = static_cast<int>(origY);
+        int checkY2 = static_cast<int>(origY + sizeInTilesY * 0.9f);
+        
+        if (currentRoom->getLandTile(checkX, checkY1) != 0 ||
+            currentRoom->getLandTile(checkX, checkY2) != 0) {
+            collidedX = true;
         } else if (!submerged && 
-                   (currentRoom->getSceneryTile(static_cast<int>(position.x), 
-                                                 static_cast<int>(position.y)) != 0 ||
-                    currentRoom->getSceneryTile(static_cast<int>(position.x), 
-                                                 static_cast<int>(position.y + sizeInTilesY * 0.9f)) != 0)) {
-            position.x = static_cast<int>(position.x) + 1;
+                   (currentRoom->getSceneryTile(checkX, checkY1) != 0 ||
+                    currentRoom->getSceneryTile(checkX, checkY2) != 0)) {
+            collidedX = true;
+        }
+        
+        if (collidedX) {
+            position.x = checkX + 1.0f;
             velocity.x = 0;
         }
-    } else {
-        // Moving right
-        if (currentRoom->getLandTile(static_cast<int>(position.x + sizeInTilesX), 
-                                      static_cast<int>(position.y)) != 0 ||
-            currentRoom->getLandTile(static_cast<int>(position.x + sizeInTilesX), 
-                                      static_cast<int>(position.y + sizeInTilesY * 0.9f)) != 0) {
-            position.x = static_cast<int>(position.x);
-            velocity.x = 0;
+    } else if (velocity.x > 0) {
+        // Moving right - check right edge
+        int checkX = static_cast<int>(position.x + sizeInTilesX);
+        int checkY1 = static_cast<int>(origY);
+        int checkY2 = static_cast<int>(origY + sizeInTilesY * 0.9f);
+        
+        if (currentRoom->getLandTile(checkX, checkY1) != 0 ||
+            currentRoom->getLandTile(checkX, checkY2) != 0) {
+            collidedX = true;
         } else if (!submerged && 
-                   (currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTilesX), 
-                                                 static_cast<int>(position.y)) != 0 ||
-                    currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTilesX), 
-                                                 static_cast<int>(position.y + sizeInTilesY * 0.9f)) != 0)) {
-            position.x = static_cast<int>(position.x);
+                   (currentRoom->getSceneryTile(checkX, checkY1) != 0 ||
+                    currentRoom->getSceneryTile(checkX, checkY2) != 0)) {
+            collidedX = true;
+        }
+        
+        if (collidedX) {
+            position.x = checkX - sizeInTilesX;
             velocity.x = 0;
         }
     }
 
-    // Vertical collision
-    if (velocity.y <= 0) {
-        // Moving up
-        if (currentRoom->getLandTile(static_cast<int>(position.x), 
-                                      static_cast<int>(position.y)) != 0 ||
-            currentRoom->getLandTile(static_cast<int>(position.x + sizeInTilesX * 0.9f), 
-                                      static_cast<int>(position.y)) != 0) {
-            position.y = static_cast<int>(position.y) + 1;
-            velocity.y = 0;
+    // --- Now check Y movement with the resolved X position ---
+    position.y += velocity.y;
+    
+    bool collidedY = false;
+    
+    if (velocity.y < 0) {
+        // Moving up - check top edge
+        int checkY = static_cast<int>(position.y);
+        int checkX1 = static_cast<int>(position.x);
+        int checkX2 = static_cast<int>(position.x + sizeInTilesX * 0.9f);
+        
+        if (currentRoom->getLandTile(checkX1, checkY) != 0 ||
+            currentRoom->getLandTile(checkX2, checkY) != 0) {
+            collidedY = true;
         } else if (!submerged && 
-                   (currentRoom->getSceneryTile(static_cast<int>(position.x), 
-                                                 static_cast<int>(position.y)) != 0 ||
-                    currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTilesX * 0.9f), 
-                                                 static_cast<int>(position.y)) != 0)) {
-            position.y = static_cast<int>(position.y) + 1;
+                   (currentRoom->getSceneryTile(checkX1, checkY) != 0 ||
+                    currentRoom->getSceneryTile(checkX2, checkY) != 0)) {
+            collidedY = true;
+        }
+        
+        if (collidedY) {
+            position.y = checkY + 1.0f;
             velocity.y = 0;
         }
-    } else {
-        // Moving down
-        if (currentRoom->getLandTile(static_cast<int>(position.x), 
-                                      static_cast<int>(position.y + sizeInTilesY)) != 0 ||
-            currentRoom->getLandTile(static_cast<int>(position.x + sizeInTilesX * 0.9f), 
-                                      static_cast<int>(position.y + sizeInTilesY)) != 0) {
-            position.y = static_cast<int>(position.y);
-            velocity.y = 0;
+    } else if (velocity.y > 0) {
+        // Moving down - check bottom edge
+        int checkY = static_cast<int>(position.y + sizeInTilesY);
+        int checkX1 = static_cast<int>(position.x);
+        int checkX2 = static_cast<int>(position.x + sizeInTilesX * 0.9f);
+        
+        if (currentRoom->getLandTile(checkX1, checkY) != 0 ||
+            currentRoom->getLandTile(checkX2, checkY) != 0) {
+            collidedY = true;
         } else if (!submerged && 
-                   (currentRoom->getSceneryTile(static_cast<int>(position.x), 
-                                                 static_cast<int>(position.y + sizeInTilesY)) != 0 ||
-                    currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTilesX * 0.9f), 
-                                                 static_cast<int>(position.y + sizeInTilesY)) != 0)) {
-            position.y = static_cast<int>(position.y);
+                   (currentRoom->getSceneryTile(checkX1, checkY) != 0 ||
+                    currentRoom->getSceneryTile(checkX2, checkY) != 0)) {
+            collidedY = true;
+        }
+        
+        if (collidedY) {
+            position.y = checkY - sizeInTilesY;
             velocity.y = 0;
         }
     }

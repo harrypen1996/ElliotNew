@@ -10,6 +10,7 @@
 #include "constants.hpp"
 #include "world/level.hpp"
 #include "entities/player.hpp"
+#include "managers/projectile_manager.hpp"
 
 namespace CanalUx {
 
@@ -53,6 +54,7 @@ private:
     // Rendering helpers
     void renderRoom();
     void renderPlayer();
+    void renderProjectiles();
     void renderTile(int screenX, int screenY, int tileIndex);
     Tyra::Sprite getTileSprite(int screenX, int screenY, int tileIndex);
 
@@ -76,9 +78,13 @@ private:
     // Player
     std::unique_ptr<Player> player;
 
+    // Managers
+    ProjectileManager projectileManager;
+
     // Textures
-    Tyra::Sprite terrainSprite;  // Base sprite for terrain tileset
-    Tyra::Sprite playerSprite;   // Player sprite
+    Tyra::Sprite terrainSprite;      // Base sprite for terrain tileset
+    Tyra::Sprite playerSprite;       // Player sprite
+    Tyra::Sprite projectileSprite;   // Projectile sprite
     
     // Camera position (in tiles)
     float cameraX;

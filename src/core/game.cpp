@@ -70,6 +70,24 @@ void Game::loadAssets() {
     terrainSprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
     texture->addLink(terrainSprite.id);
     
+    // Load player texture
+    filepath = Tyra::FileUtils::fromCwd("elliot.png");
+    auto* playerTexture = textureRepository.add(filepath);
+    
+    // Set up player sprite
+    playerSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    playerSprite.size = Tyra::Vec2(Constants::PLAYER_SIZE, Constants::PLAYER_SIZE);
+    playerTexture->addLink(playerSprite.id);
+    
+    // Load projectile texture (items sheet)
+    filepath = Tyra::FileUtils::fromCwd("items_sheet.png");
+    auto* projectileTexture = textureRepository.add(filepath);
+    
+    // Set up projectile sprite
+    projectileSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+    projectileSprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
+    projectileTexture->addLink(projectileSprite.id);
+    
     TYRA_LOG("CanalUx: Assets loaded");
 }
 
@@ -82,12 +100,21 @@ void Game::initLevel(int levelNumber) {
     currentLevel = std::make_unique<Level>(levelNumber);
     currentLevel->generate();
     
-    // Get the start room and center camera on it
+    // Create player
+    player = std::make_unique<Player>(&engine->pad);
+    
+    // Get the start room and position player in center
     Room* startRoom = currentLevel->getStartRoom();
     if (startRoom) {
-        // Center camera on the room
-        cameraX = startRoom->getWidth() / 2.0f;
-        cameraY = startRoom->getHeight() / 2.0f;
+        // Position player in center of room
+        player->position.x = startRoom->getWidth() / 2.0f - 0.5f;
+        player->position.y = startRoom->getHeight() / 2.0f - 0.5f;
+        
+        // Center camera on player
+        cameraX = player->position.x + 0.5f;
+        cameraY = player->position.y + 0.5f;
+        
+        TYRA_LOG("Player spawned at (", player->position.x, ", ", player->position.y, ")");
     }
     
     TYRA_LOG("CanalUx: Level ", levelNumber, " ready");
@@ -98,6 +125,8 @@ void Game::cleanup() {
     
     // Free textures
     engine->renderer.getTextureRepository().freeBySprite(terrainSprite);
+    engine->renderer.getTextureRepository().freeBySprite(playerSprite);
+    engine->renderer.getTextureRepository().freeBySprite(projectileSprite);
     
     TYRA_LOG("CanalUx: Cleanup complete");
 }
@@ -112,27 +141,10 @@ void Game::handleInput() {
         }
     }
 
-    // Debug: Circle to quit
+    // Debug: Circle to reset level
     if (engine->pad.getPressed().Circle) {
-        exit(0);
-    }
-    
-    // Temporary: D-pad to move camera for testing
-    if (state == GameState::PLAYING) {
-        const auto& pad = engine->pad;
-        
-        if (pad.getPressed().DpadLeft) {
-            cameraX -= 0.5f;
-        }
-        if (pad.getPressed().DpadRight) {
-            cameraX += 0.5f;
-        }
-        if (pad.getPressed().DpadUp) {
-            cameraY -= 0.5f;
-        }
-        if (pad.getPressed().DpadDown) {
-            cameraY += 0.5f;
-        }
+        TYRA_LOG("CanalUx: Resetting level...");
+        initLevel(currentLevelNumber);
     }
 }
 
@@ -143,7 +155,81 @@ void Game::update() {
 
     // Get current room
     Room* room = currentLevel->getCurrentRoom();
-    if (!room) return;
+    if (!room || !player) return;
+    
+    // Update player (with projectile manager for shooting)
+    player->update(room, &projectileManager);
+    
+    // Update projectiles
+    projectileManager.update(room);
+    
+    // Check for room transitions
+    int currentGridX = currentLevel->getCurrentGridX();
+    int currentGridY = currentLevel->getCurrentGridY();
+    bool roomChanged = false;
+    
+    // Left exit
+    if (player->position.x < 0.0f) {
+        Room* nextRoom = currentLevel->getRoom(currentGridX - 1, currentGridY);
+        if (nextRoom && nextRoom->exists()) {
+            currentLevel->setCurrentRoom(currentGridX - 1, currentGridY);
+            player->position.x = nextRoom->getWidth() - 2.0f;
+            player->position.y = nextRoom->getHeight() / 2.0f - 0.5f;
+            roomChanged = true;
+            TYRA_LOG("Moved to room (", currentGridX - 1, ", ", currentGridY, ")");
+        } else {
+            player->position.x = 0.0f;
+        }
+    }
+    // Right exit
+    else if (player->position.x > room->getWidth() - 1.0f) {
+        Room* nextRoom = currentLevel->getRoom(currentGridX + 1, currentGridY);
+        if (nextRoom && nextRoom->exists()) {
+            currentLevel->setCurrentRoom(currentGridX + 1, currentGridY);
+            player->position.x = 1.0f;
+            player->position.y = nextRoom->getHeight() / 2.0f - 0.5f;
+            roomChanged = true;
+            TYRA_LOG("Moved to room (", currentGridX + 1, ", ", currentGridY, ")");
+        } else {
+            player->position.x = room->getWidth() - 1.0f;
+        }
+    }
+    // Top exit
+    else if (player->position.y < 0.0f) {
+        Room* nextRoom = currentLevel->getRoom(currentGridX, currentGridY - 1);
+        if (nextRoom && nextRoom->exists()) {
+            currentLevel->setCurrentRoom(currentGridX, currentGridY - 1);
+            player->position.x = nextRoom->getWidth() / 2.0f - 0.5f;
+            player->position.y = nextRoom->getHeight() - 2.0f;
+            roomChanged = true;
+            TYRA_LOG("Moved to room (", currentGridX, ", ", currentGridY - 1, ")");
+        } else {
+            player->position.y = 0.0f;
+        }
+    }
+    // Bottom exit
+    else if (player->position.y > room->getHeight() - 1.0f) {
+        Room* nextRoom = currentLevel->getRoom(currentGridX, currentGridY + 1);
+        if (nextRoom && nextRoom->exists()) {
+            currentLevel->setCurrentRoom(currentGridX, currentGridY + 1);
+            player->position.x = nextRoom->getWidth() / 2.0f - 0.5f;
+            player->position.y = 1.0f;
+            roomChanged = true;
+            TYRA_LOG("Moved to room (", currentGridX, ", ", currentGridY + 1, ")");
+        } else {
+            player->position.y = room->getHeight() - 1.0f;
+        }
+    }
+    
+    // Clear projectiles and update room pointer if changed
+    if (roomChanged) {
+        projectileManager.clear();
+        room = currentLevel->getCurrentRoom();
+    }
+    
+    // Camera follows player
+    cameraX = player->position.x + 0.5f;
+    cameraY = player->position.y + 0.5f;
     
     // Clamp camera to room bounds
     float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
@@ -170,6 +256,8 @@ void Game::render() {
         case GameState::PLAYING:
         case GameState::PAUSED:
             renderRoom();
+            renderProjectiles();
+            renderPlayer();
             
             if (state == GameState::PAUSED) {
                 // TODO: Render pause overlay
@@ -240,6 +328,91 @@ void Game::renderRoom() {
                 renderer.renderer2D.render(getTileSprite(screenX, screenY, sceneryTile - 1));
             }
         }
+    }
+}
+
+void Game::renderPlayer() {
+    if (!player) return;
+    
+    Room* room = currentLevel->getCurrentRoom();
+    if (!room) return;
+    
+    auto& renderer = engine->renderer;
+    
+    // Calculate camera offset (same as in renderRoom)
+    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
+    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
+    
+    float offsetX = cameraX - halfScreenTilesX;
+    float offsetY = cameraY - halfScreenTilesY;
+    
+    // Clamp offsets
+    if (offsetX < 0) offsetX = 0;
+    if (offsetY < 0) offsetY = 0;
+    if (offsetX > room->getWidth() - halfScreenTilesX * 2) 
+        offsetX = room->getWidth() - halfScreenTilesX * 2;
+    if (offsetY > room->getHeight() - halfScreenTilesY * 2) 
+        offsetY = room->getHeight() - halfScreenTilesY * 2;
+    
+    // Calculate player screen position
+    float screenX = (player->position.x - offsetX) * Constants::TILE_SIZE;
+    float screenY = (player->position.y - offsetY) * Constants::TILE_SIZE;
+    
+    // Update player sprite position
+    playerSprite.position = Tyra::Vec2(screenX, screenY);
+    
+    renderer.renderer2D.render(playerSprite);
+}
+
+void Game::renderProjectiles() {
+    Room* room = currentLevel->getCurrentRoom();
+    if (!room) return;
+    
+    auto& renderer = engine->renderer;
+    
+    // Calculate camera offset (same as in renderRoom)
+    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
+    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
+    
+    float offsetX = cameraX - halfScreenTilesX;
+    float offsetY = cameraY - halfScreenTilesY;
+    
+    // Clamp offsets
+    if (offsetX < 0) offsetX = 0;
+    if (offsetY < 0) offsetY = 0;
+    if (offsetX > room->getWidth() - halfScreenTilesX * 2) 
+        offsetX = room->getWidth() - halfScreenTilesX * 2;
+    if (offsetY > room->getHeight() - halfScreenTilesY * 2) 
+        offsetY = room->getHeight() - halfScreenTilesY * 2;
+    
+    // Render each projectile
+    for (const auto& projectile : projectileManager.getProjectiles()) {
+        if (!projectile.isActive()) continue;
+        
+        // Calculate screen position
+        float screenX = (projectile.position.x - offsetX) * Constants::TILE_SIZE;
+        float screenY = (projectile.position.y - offsetY) * Constants::TILE_SIZE;
+        
+        // Create sprite for this projectile
+        Tyra::Sprite sprite;
+        sprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
+        sprite.position = Tyra::Vec2(screenX, screenY);
+        sprite.id = projectileSprite.id;
+        sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+        
+        // Use a specific tile from the items sheet for projectile
+        // The items sheet is 256px wide with 16px tiles = 16 tiles per row
+        int tileIndex = 98;  // Adjust this to pick the right projectile sprite
+        int tilesPerRow = 256 / 16;
+        int column = tileIndex % tilesPerRow;
+        int row = tileIndex / tilesPerRow;
+        
+        sprite.offset = Tyra::Vec2(
+            static_cast<float>(column * 16),
+            static_cast<float>(row * 16)
+        );
+        
+        renderer.renderer2D.render(sprite);
     }
 }
 
