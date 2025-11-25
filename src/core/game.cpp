@@ -46,7 +46,7 @@ void Game::initRenderers() {
     
     roomRenderer.init(&textureRepo);
     entityRenderer.init(&textureRepo);
-    hudRenderer.init(&textureRepo);
+    hudRenderer.init(&textureRepo, &engine->renderer.renderer2D);
     
     TYRA_LOG("CanalUx: Renderers initialized");
 }

@@ -8,6 +8,7 @@
 #include <tyra>
 #include "core/constants.hpp"
 #include "components/stats.hpp"
+#include "rendering/font.hpp"
 
 namespace CanalUx {
 
@@ -20,7 +21,7 @@ public:
     ~HUDRenderer();
 
     // Initialize and load HUD textures
-    void init(Tyra::TextureRepository* textureRepo);
+    void init(Tyra::TextureRepository* textureRepo, Tyra::Renderer2D* renderer2D);
     
     // Cleanup textures
     void cleanup(Tyra::TextureRepository* textureRepo);
@@ -35,6 +36,8 @@ private:
 
     Tyra::Sprite heartSprite;    // Heart sprites for health
     Tyra::Sprite minimapSprite;  // Minimap room squares
+    
+    Font font;  // Text rendering
     
     float screenWidth;
     float screenHeight;

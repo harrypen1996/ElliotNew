@@ -16,19 +16,25 @@ HUDRenderer::HUDRenderer()
 HUDRenderer::~HUDRenderer() {
 }
 
-void HUDRenderer::init(Tyra::TextureRepository* textureRepo) {
-    // Load items sheet for heart sprites and minimap icons
-    auto filepath = Tyra::FileUtils::fromCwd("items_sheet.png");
-    auto* itemsTexture = textureRepo->add(filepath);
+void HUDRenderer::init(Tyra::TextureRepository* textureRepo, Tyra::Renderer2D* renderer2D) {
+    // Load hearts texture (128x32, contains 3 heart sprites at 32x32 each)
+    auto filepath = Tyra::FileUtils::fromCwd("hearts.png");
+    auto* heartsTexture = textureRepo->add(filepath);
     
     heartSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    heartSprite.size = Tyra::Vec2(16.0f, 16.0f);
-    itemsTexture->addLink(heartSprite.id);
+    heartSprite.size = Tyra::Vec2(32.0f, 32.0f);
+    heartsTexture->addLink(heartSprite.id);
     
-    // Use same texture for minimap icons
+    // Load items sheet for minimap icons
+    filepath = Tyra::FileUtils::fromCwd("items_sheet.png");
+    auto* itemsTexture = textureRepo->add(filepath);
+    
     minimapSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
     minimapSprite.size = Tyra::Vec2(8.0f, 8.0f);
     itemsTexture->addLink(minimapSprite.id);
+    
+    // Load font
+    font.load(textureRepo, renderer2D);
     
     TYRA_LOG("HUDRenderer: Initialized");
 }
@@ -36,6 +42,7 @@ void HUDRenderer::init(Tyra::TextureRepository* textureRepo) {
 void HUDRenderer::cleanup(Tyra::TextureRepository* textureRepo) {
     textureRepo->freeBySprite(heartSprite);
     textureRepo->freeBySprite(minimapSprite);
+    font.free(textureRepo);
 }
 
 void HUDRenderer::render(Tyra::Renderer2D* renderer, const Player* player, const Level* level) {
@@ -63,45 +70,36 @@ void HUDRenderer::renderHealth(Tyra::Renderer2D* renderer, const Player* player)
     // Position hearts in top-left corner
     float startX = 10.0f;
     float startY = 10.0f;
-    float heartSpacing = 18.0f;
+    float heartSize = 32.0f;  // Display size
+    float heartSpacing = 34.0f;
     
-    // Items sheet is 256px wide with 16px tiles = 16 tiles per row
-    // Heart tiles - look for heart/orb sprites in your sheet
-    // Row 12-13 area seems to have circular icons
-    // Adjust these values to match your actual heart sprites
-    int fullHeartTile = 196;   // Try different values to find hearts
-    int halfHeartTile = 197;   
-    int emptyHeartTile = 198;
-    
-    int tilesPerRow = 256 / 16;
+    // Hearts texture is 128x32 with 3 hearts at 32px each
+    // Full heart at x=0, half heart at x=32, empty heart at x=64
+    float fullHeartOffset = 0.0f;
+    float halfHeartOffset = 32.0f;
+    float emptyHeartOffset = 64.0f;
     
     // Draw hearts (each heart = 2 health points)
     int numHearts = maxHealth / 2;
     
     for (int i = 0; i < numHearts; i++) {
         int heartHealth = currentHealth - (i * 2);
-        int tileIndex;
+        float offsetX;
         
         if (heartHealth >= 2) {
-            tileIndex = fullHeartTile;
+            offsetX = fullHeartOffset;
         } else if (heartHealth == 1) {
-            tileIndex = halfHeartTile;
+            offsetX = halfHeartOffset;
         } else {
-            tileIndex = emptyHeartTile;
+            offsetX = emptyHeartOffset;
         }
-        
-        int column = tileIndex % tilesPerRow;
-        int row = tileIndex / tilesPerRow;
         
         Tyra::Sprite heart;
         heart.id = heartSprite.id;
         heart.mode = Tyra::SpriteMode::MODE_REPEAT;
-        heart.size = Tyra::Vec2(16.0f, 16.0f);
+        heart.size = Tyra::Vec2(heartSize, heartSize);
         heart.position = Tyra::Vec2(startX + i * heartSpacing, startY);
-        heart.offset = Tyra::Vec2(
-            static_cast<float>(column * 16),
-            static_cast<float>(row * 16)
-        );
+        heart.offset = Tyra::Vec2(offsetX, 0.0f);
         
         renderer->render(heart);
     }
@@ -184,37 +182,17 @@ void HUDRenderer::renderMinimap(Tyra::Renderer2D* renderer, const Level* level) 
 }
 
 void HUDRenderer::renderLevelIndicator(Tyra::Renderer2D* renderer, const Level* level) {
-    // Position level indicator below minimap
-    float indicatorX = screenWidth - 90.0f;
-    float indicatorY = 110.0f;
+    // Position level text below minimap
+    int textX = static_cast<int>(screenWidth - 95.0f);
+    int textY = 115;
     
     int levelNum = level->getLevelNumber();
     
-    // Draw level number as colored squares (1, 2, or 3 squares)
-    for (int i = 0; i < levelNum; i++) {
-        Tyra::Sprite levelDot;
-        levelDot.id = minimapSprite.id;
-        levelDot.mode = Tyra::SpriteMode::MODE_REPEAT;
-        levelDot.size = Tyra::Vec2(12.0f, 12.0f);
-        levelDot.position = Tyra::Vec2(indicatorX + i * 16.0f, indicatorY);
-        levelDot.color = Tyra::Color(255, 200, 100);  // Orange/gold
-        levelDot.offset = Tyra::Vec2(0, 0);
-        
-        renderer->render(levelDot);
-    }
-    
-    // Draw empty dots for remaining levels
-    for (int i = levelNum; i < Constants::TOTAL_LEVELS; i++) {
-        Tyra::Sprite levelDot;
-        levelDot.id = minimapSprite.id;
-        levelDot.mode = Tyra::SpriteMode::MODE_REPEAT;
-        levelDot.size = Tyra::Vec2(12.0f, 12.0f);
-        levelDot.position = Tyra::Vec2(indicatorX + i * 16.0f, indicatorY);
-        levelDot.color = Tyra::Color(80, 80, 80);  // Dark gray
-        levelDot.offset = Tyra::Vec2(0, 0);
-        
-        renderer->render(levelDot);
-    }
+    // Draw "Level X" text with shadow for visibility
+    std::string levelText = "Level " + std::to_string(levelNum);
+    font.drawTextWithShadow(levelText, textX, textY, 
+                            Tyra::Color(255, 255, 255),   // White text
+                            Tyra::Color(0, 0, 0));        // Black shadow
 }
 
 }  // namespace CanalUx
