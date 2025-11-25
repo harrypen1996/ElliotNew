@@ -9,17 +9,14 @@
 #include <memory>
 #include "constants.hpp"
 #include "world/level.hpp"
+#include "entities/player.hpp"
+
+namespace CanalUx {
 
 // Forward declarations
-namespace CanalUx {
-    class Player;
-    class Level;
-    class EntityManager;
-    class TextureManager;
-    class Camera;
-}
-
-namespace CanalUx {
+class EntityManager;
+class TextureManager;
+class Camera;
 
 enum class GameState {
     MENU,
@@ -53,6 +50,12 @@ private:
     void update();
     void render();
 
+    // Rendering helpers
+    void renderRoom();
+    void renderPlayer();
+    void renderTile(int screenX, int screenY, int tileIndex);
+    Tyra::Sprite getTileSprite(int screenX, int screenY, int tileIndex);
+
     // State transitions
     void setState(GameState newState);
     void startNewGame();
@@ -67,17 +70,25 @@ private:
     GameState state;
     int currentLevelNumber;
 
-    // Subsystems (will be implemented as we go)
-    // std::unique_ptr<TextureManager> textureManager;
-    // std::unique_ptr<EntityManager> entityManager;
-    // std::unique_ptr<Camera> camera;
-    // std::unique_ptr<Player> player;
-    
+    // Level
     std::unique_ptr<Level> currentLevel;
 
-    // Temporary - until we implement proper subsystems
+    // Player
+    std::unique_ptr<Player> player;
+
+    // Textures
+    Tyra::Sprite terrainSprite;  // Base sprite for terrain tileset
+    Tyra::Sprite playerSprite;   // Player sprite
+    
+    // Camera position (in tiles)
+    float cameraX;
+    float cameraY;
+
+    // Screen info
     float screenWidth;
     float screenHeight;
+    int visibleTilesX;
+    int visibleTilesY;
 };
 
 }  // namespace CanalUx

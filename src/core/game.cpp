@@ -10,8 +10,12 @@ Game::Game(Tyra::Engine* t_engine)
     : engine(t_engine),
       state(GameState::MENU),
       currentLevelNumber(1),
+      cameraX(0.0f),
+      cameraY(0.0f),
       screenWidth(Constants::SCREEN_WIDTH),
-      screenHeight(Constants::SCREEN_HEIGHT) {
+      screenHeight(Constants::SCREEN_HEIGHT),
+      visibleTilesX(0),
+      visibleTilesY(0) {
 }
 
 Game::~Game() {
@@ -28,14 +32,18 @@ void Game::init() {
     auto& screenSettings = engine->renderer.core.getSettings();
     screenWidth = screenSettings.getWidth();
     screenHeight = screenSettings.getHeight();
+    
+    // Calculate visible tiles
+    visibleTilesX = static_cast<int>(screenWidth / Constants::TILE_SIZE) + 2;
+    visibleTilesY = static_cast<int>(screenHeight / Constants::TILE_SIZE) + 2;
 
     TYRA_LOG("Screen size: ", screenWidth, "x", screenHeight);
+    TYRA_LOG("Visible tiles: ", visibleTilesX, "x", visibleTilesY);
 
     // Load all game assets
     loadAssets();
 
-    // For now, jump straight into playing
-    // Later we'll add a proper menu
+    // Start the game
     startNewGame();
 
     TYRA_LOG("CanalUx: Initialization complete");
@@ -50,9 +58,17 @@ void Game::loop() {
 void Game::loadAssets() {
     TYRA_LOG("CanalUx: Loading assets...");
     
-    // TODO: Initialize TextureManager and load all spritesheets
-    // textureManager = std::make_unique<TextureManager>(engine);
-    // textureManager->loadAll();
+    auto& renderer = engine->renderer;
+    auto& textureRepository = renderer.getTextureRepository();
+    
+    // Load terrain tileset
+    auto filepath = Tyra::FileUtils::fromCwd("all2.png");
+    auto* texture = textureRepository.add(filepath);
+    
+    // Set up terrain sprite for tile rendering
+    terrainSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+    terrainSprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
+    texture->addLink(terrainSprite.id);
     
     TYRA_LOG("CanalUx: Assets loaded");
 }
@@ -66,9 +82,13 @@ void Game::initLevel(int levelNumber) {
     currentLevel = std::make_unique<Level>(levelNumber);
     currentLevel->generate();
     
-    // TODO: Spawn player at start room
-    // Room* startRoom = currentLevel->getStartRoom();
-    // player->position = startRoom->getSpawnPoint(-1);  // -1 = center spawn
+    // Get the start room and center camera on it
+    Room* startRoom = currentLevel->getStartRoom();
+    if (startRoom) {
+        // Center camera on the room
+        cameraX = startRoom->getWidth() / 2.0f;
+        cameraY = startRoom->getHeight() / 2.0f;
+    }
     
     TYRA_LOG("CanalUx: Level ", levelNumber, " ready");
 }
@@ -76,7 +96,8 @@ void Game::initLevel(int levelNumber) {
 void Game::cleanup() {
     TYRA_LOG("CanalUx: Cleaning up...");
     
-    // TODO: Free textures and resources
+    // Free textures
+    engine->renderer.getTextureRepository().freeBySprite(terrainSprite);
     
     TYRA_LOG("CanalUx: Cleanup complete");
 }
@@ -95,9 +116,24 @@ void Game::handleInput() {
     if (engine->pad.getPressed().Circle) {
         exit(0);
     }
-
-    // State-specific input is handled by respective systems
-    // e.g., player input handled by Player::update()
+    
+    // Temporary: D-pad to move camera for testing
+    if (state == GameState::PLAYING) {
+        const auto& pad = engine->pad;
+        
+        if (pad.getPressed().DpadLeft) {
+            cameraX -= 0.5f;
+        }
+        if (pad.getPressed().DpadRight) {
+            cameraX += 0.5f;
+        }
+        if (pad.getPressed().DpadUp) {
+            cameraY -= 0.5f;
+        }
+        if (pad.getPressed().DpadDown) {
+            cameraY += 0.5f;
+        }
+    }
 }
 
 void Game::update() {
@@ -105,14 +141,20 @@ void Game::update() {
         return;
     }
 
-    // TODO: Update all game systems
-    // player->update(currentLevel->getCurrentRoom(), entityManager.get());
-    // entityManager->update(currentLevel->getCurrentRoom());
-    // camera->follow(player->getPosition());
+    // Get current room
+    Room* room = currentLevel->getCurrentRoom();
+    if (!room) return;
     
-    // Check for room transitions
-    // Check for level completion
-    // Check for player death
+    // Clamp camera to room bounds
+    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
+    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
+    
+    if (cameraX < halfScreenTilesX) cameraX = halfScreenTilesX;
+    if (cameraY < halfScreenTilesY) cameraY = halfScreenTilesY;
+    if (cameraX > room->getWidth() - halfScreenTilesX) 
+        cameraX = room->getWidth() - halfScreenTilesX;
+    if (cameraY > room->getHeight() - halfScreenTilesY) 
+        cameraY = room->getHeight() - halfScreenTilesY;
 }
 
 void Game::render() {
@@ -127,15 +169,7 @@ void Game::render() {
             
         case GameState::PLAYING:
         case GameState::PAUSED:
-            // TODO: Render game world
-            // Render order:
-            // 1. Water layer (background)
-            // 2. Land/terrain layer
-            // 3. Obstacles (shopping carts, logs)
-            // 4. Entities sorted by Y (mobs, projectiles)
-            // 5. Player (unless submerged, then before obstacles)
-            // 6. Scenery layer (things that go on top)
-            // 7. HUD
+            renderRoom();
             
             if (state == GameState::PAUSED) {
                 // TODO: Render pause overlay
@@ -154,18 +188,92 @@ void Game::render() {
     renderer.endFrame();
 }
 
+void Game::renderRoom() {
+    Room* room = currentLevel->getCurrentRoom();
+    if (!room) return;
+    
+    auto& renderer = engine->renderer;
+    
+    // Calculate the top-left visible tile based on camera position
+    float halfScreenTilesX = (screenWidth / Constants::TILE_SIZE) / 2.0f;
+    float halfScreenTilesY = (screenHeight / Constants::TILE_SIZE) / 2.0f;
+    
+    float offsetX = cameraX - halfScreenTilesX;
+    float offsetY = cameraY - halfScreenTilesY;
+    
+    // Clamp offsets
+    if (offsetX < 0) offsetX = 0;
+    if (offsetY < 0) offsetY = 0;
+    if (offsetX > room->getWidth() - visibleTilesX + 2) 
+        offsetX = room->getWidth() - visibleTilesX + 2;
+    if (offsetY > room->getHeight() - visibleTilesY + 2) 
+        offsetY = room->getHeight() - visibleTilesY + 2;
+    
+    // Sub-tile offset for smooth scrolling
+    float tileOffsetX = (offsetX - static_cast<int>(offsetX)) * Constants::TILE_SIZE;
+    float tileOffsetY = (offsetY - static_cast<int>(offsetY)) * Constants::TILE_SIZE;
+    
+    // Render visible tiles
+    for (int x = -1; x < visibleTilesX; x++) {
+        for (int y = -1; y < visibleTilesY; y++) {
+            int tileX = static_cast<int>(offsetX) + x;
+            int tileY = static_cast<int>(offsetY) + y;
+            
+            int screenX = x * Constants::TILE_SIZE - static_cast<int>(tileOffsetX);
+            int screenY = y * Constants::TILE_SIZE - static_cast<int>(tileOffsetY);
+            
+            // Render water layer (background)
+            int waterTile = room->getWaterTile(tileX, tileY);
+            if (waterTile > 0) {
+                renderer.renderer2D.render(getTileSprite(screenX, screenY, waterTile - 1));
+            }
+            
+            // Render land layer (walls/terrain)
+            int landTile = room->getLandTile(tileX, tileY);
+            if (landTile > 0) {
+                renderer.renderer2D.render(getTileSprite(screenX, screenY, landTile - 1));
+            }
+            
+            // Render scenery layer (obstacles, decorations)
+            int sceneryTile = room->getSceneryTile(tileX, tileY);
+            if (sceneryTile > 0) {
+                renderer.renderer2D.render(getTileSprite(screenX, screenY, sceneryTile - 1));
+            }
+        }
+    }
+}
+
+Tyra::Sprite Game::getTileSprite(int screenX, int screenY, int tileIndex) {
+    Tyra::Sprite sprite;
+    sprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
+    sprite.position = Tyra::Vec2(static_cast<float>(screenX), static_cast<float>(screenY));
+    sprite.id = terrainSprite.id;
+    sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+    
+    // Calculate offset in tileset (16 tiles per row in a 512px wide texture)
+    int tilesPerRow = 512 / Constants::TILE_SIZE;  // 16 tiles
+    int column = tileIndex % tilesPerRow;
+    int row = tileIndex / tilesPerRow;
+    
+    sprite.offset = Tyra::Vec2(
+        static_cast<float>(column * Constants::TILE_SIZE),
+        static_cast<float>(row * Constants::TILE_SIZE)
+    );
+    
+    return sprite;
+}
+
+void Game::renderTile(int screenX, int screenY, int tileIndex) {
+    engine->renderer.renderer2D.render(getTileSprite(screenX, screenY, tileIndex));
+}
+
 void Game::setState(GameState newState) {
-    //TYRA_LOG("CanalUx: State change ", static_cast<int>(state), " -> ", static_cast<int>(newState));
+    TYRA_LOG("CanalUx: State change ", static_cast<int>(state), " -> ", static_cast<int>(newState));
     state = newState;
 }
 
 void Game::startNewGame() {
     TYRA_LOG("CanalUx: Starting new game");
-    
-    // TODO: Reset player stats
-    // player = std::make_unique<Player>(&engine->pad);
-    // entityManager = std::make_unique<EntityManager>();
-    // camera = std::make_unique<Camera>(screenWidth, screenHeight);
     
     initLevel(1);
     setState(GameState::PLAYING);
