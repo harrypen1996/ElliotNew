@@ -36,7 +36,7 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     
     // Load mob sprite sheet (512x512, 32x32 tiles)
     // Layout: row 0 = duck(0), player(1), frog(2), swan(3), ...
-    filepath = Tyra::FileUtils::fromCwd("mobs.png");
+    filepath = Tyra::FileUtils::fromCwd("mobs_new.png");
     auto* mobTexture = textureRepo->add(filepath);
     
     mobSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
@@ -127,8 +127,11 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
                                  const MobManager* mobManager) {
     if (!mobManager || !camera) return;
     
-    // Sprite sheet layout (32x32 tiles):
-    // Row 0: duck(0), player(1), frog(2), swan(3), ...
+    // Sprite sheet layout (32x32 tiles, VERTICAL):
+    // Row 0: duck
+    // Row 2: frog
+    // Row 3-4: boss (2 tiles tall)
+    // Row 5: swan
     const float tileSize = 32.0f;
     
     for (const auto& mob : mobManager->getMobs()) {
@@ -140,42 +143,36 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         Tyra::Sprite sprite;
         sprite.id = mobSprite.id;
         sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-        sprite.size = Tyra::Vec2(tileSize, tileSize);  // Source size from sheet
         sprite.position = screenPos;
         
-        // Select tile index based on mob type
-        // Layout: duck=0, (player=1), frog=2, swan=3
-        int tileIndex = 0;
+        // Select Y offset and size based on mob type
+        float offsetY = 0.0f;
+        float srcWidth = 64.0f;
+        float srcHeight = 64.0f;  // Default 32px tall
+        
         switch (mob.type) {
             case MobType::DUCK:
-                tileIndex = 0;
-                break;
-            case MobType::FROG:
-                tileIndex = 2;
+                offsetY = 0.0f;    // Row 0
                 break;
             case MobType::SWAN:
-                tileIndex = 3;
+                offsetY = 64.0f;   // Row 1
+                break;
+            case MobType::FROG:
+                offsetY = 128.0f;  // Row 2
                 break;
             case MobType::BOSS:
-                tileIndex = 2;  // Use frog for boss, can change later
+                offsetY = 192.0f;   // Row 3
                 break;
             default:
-                tileIndex = 0;
+                offsetY = 0.0f;
                 break;
         }
         
-        // Calculate offset in sprite sheet
-        int tilesPerRow = 512 / 32;  // 16 tiles per row
-        int column = tileIndex % tilesPerRow;
-        int row = tileIndex / tilesPerRow;
-        
-        sprite.offset = Tyra::Vec2(
-            static_cast<float>(column * 32),
-            static_cast<float>(row * 32)
-        );
+        sprite.size = Tyra::Vec2(srcWidth, srcHeight);
+        sprite.offset = Tyra::Vec2(0.0f, offsetY);
         
         // Scale sprite to match mob size (mob.size is in pixels)
-        sprite.scale = mob.size.x / tileSize;
+        sprite.scale = 0.5f;//mob.size.x / tileSize;
         
         // Handle submerged state (frog underwater)
         if (mob.submerged) {
