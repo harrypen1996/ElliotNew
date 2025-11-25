@@ -1,4 +1,4 @@
-TARGET      := racer.elf
+TARGET      := elliot.elf
 ENGINEDIR	:= /tyra/engine
 
 #The Directories, Source, Includes, Objects, Binary and Resources

@@ -1,10 +1,16 @@
 #include <tyra>
-#include "racer_game.hpp"
+#include "elliot_game.hpp"
 
 int main() {
-  Tyra::Engine engine;
-  Racer::RacerGame game(&engine);
+  Tyra::EngineOptions options;
+  
+  // Set to true if you want to see logs on your PC while running on PS2
+  options.loadUsbDriver = false; 
+  options.writeLogsToFile = false;
+
+  Tyra::Engine engine(options);
+
+  Elliot::ElliotGame game(&engine);
   engine.run(&game);
-  SleepThread();
   return 0;
 }
