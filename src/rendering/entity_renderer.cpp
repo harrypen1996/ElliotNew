@@ -10,7 +10,8 @@
 
 namespace CanalUx {
 
-EntityRenderer::EntityRenderer() {
+EntityRenderer::EntityRenderer() 
+    : flashCounter(0) {
 }
 
 EntityRenderer::~EntityRenderer() {
@@ -33,12 +34,13 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     projectileSprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
     projectileTexture->addLink(projectileSprite.id);
     
-    // Load mob texture
+    // Load mob sprite sheet (512x512, 32x32 tiles)
+    // Layout: row 0 = duck(0), player(1), frog(2), swan(3), ...
     filepath = Tyra::FileUtils::fromCwd("mobs.png");
     auto* mobTexture = textureRepo->add(filepath);
     
     mobSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-    mobSprite.size = Tyra::Vec2(Constants::TILE_SIZE, Constants::TILE_SIZE);
+    mobSprite.size = Tyra::Vec2(32.0f, 32.0f);  // Each tile is 32x32
     mobTexture->addLink(mobSprite.id);
     
     TYRA_LOG("EntityRenderer: Initialized");
@@ -66,6 +68,16 @@ void EntityRenderer::renderPlayer(Tyra::Renderer2D* renderer,
                                    const Player* player) {
     if (!player || !camera) return;
     
+    // Skip rendering every other frame when invincible (flash effect)
+    if (player->isInvincible()) {
+        flashCounter++;
+        if (flashCounter % 8 < 4) {
+            return;  // Don't render this frame
+        }
+    } else {
+        flashCounter = 0;
+    }
+    
     Tyra::Vec2 screenPos = camera->worldToScreen(player->position);
     
     playerSprite.position = screenPos;
@@ -89,9 +101,14 @@ void EntityRenderer::renderProjectiles(Tyra::Renderer2D* renderer,
         sprite.id = projectileSprite.id;
         sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
         
-        // Use a specific tile from the items sheet for projectile
-        // The items sheet is 256px wide with 16px tiles = 16 tiles per row
-        int tileIndex = 98;  // Adjust this to pick the right projectile sprite
+        // Use different tile for player vs enemy projectiles
+        int tileIndex;
+        if (projectile.isFromPlayer()) {
+            tileIndex = 98;   // Player projectile
+        } else {
+            tileIndex = 99;   // Enemy projectile (feather) - adjust as needed
+        }
+        
         int tilesPerRow = 256 / 16;
         int column = tileIndex % tilesPerRow;
         int row = tileIndex / tilesPerRow;
@@ -110,6 +127,10 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
                                  const MobManager* mobManager) {
     if (!mobManager || !camera) return;
     
+    // Sprite sheet layout (32x32 tiles):
+    // Row 0: duck(0), player(1), frog(2), swan(3), ...
+    const float tileSize = 32.0f;
+    
     for (const auto& mob : mobManager->getMobs()) {
         if (!mob.active) continue;
         
@@ -117,21 +138,34 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         
         // Create sprite for this mob
         Tyra::Sprite sprite;
-        sprite.size = mob.size;
-        sprite.position = screenPos;
         sprite.id = mobSprite.id;
         sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+        sprite.size = Tyra::Vec2(tileSize, tileSize);  // Source size from sheet
+        sprite.position = screenPos;
         
-        // Select tile based on mob type
-        // The mobs sheet is 256px wide with 32px tiles = 8 tiles per row
+        // Select tile index based on mob type
+        // Layout: duck=0, (player=1), frog=2, swan=3
         int tileIndex = 0;
         switch (mob.type) {
-            case 0: tileIndex = 0; break;   // Normal mob
-            case 1: tileIndex = 8; break;   // Boss (different row)
-            default: tileIndex = 0; break;
+            case MobType::DUCK:
+                tileIndex = 0;
+                break;
+            case MobType::FROG:
+                tileIndex = 2;
+                break;
+            case MobType::SWAN:
+                tileIndex = 3;
+                break;
+            case MobType::BOSS:
+                tileIndex = 2;  // Use frog for boss, can change later
+                break;
+            default:
+                tileIndex = 0;
+                break;
         }
         
-        int tilesPerRow = 256 / 32;
+        // Calculate offset in sprite sheet
+        int tilesPerRow = 512 / 32;  // 16 tiles per row
         int column = tileIndex % tilesPerRow;
         int row = tileIndex / tilesPerRow;
         
@@ -140,9 +174,15 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
             static_cast<float>(row * 32)
         );
         
-        // Scale sprite if mob size differs from tile size
-        if (mob.size.x != 32.0f) {
-            sprite.scale = mob.size.x / 32.0f;
+        // Scale sprite to match mob size (mob.size is in pixels)
+        sprite.scale = mob.size.x / tileSize;
+        
+        // Handle submerged state (frog underwater)
+        if (mob.submerged) {
+            // Make semi-transparent when submerged
+            sprite.color = Tyra::Color(128, 128, 180, 100);
+            // Also scale down slightly to show "sinking"
+            sprite.scale *= 0.6f;
         }
         
         renderer->render(sprite);

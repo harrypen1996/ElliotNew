@@ -41,7 +41,9 @@ public:
 private:
     Tyra::Sprite playerSprite;
     Tyra::Sprite projectileSprite;
-    Tyra::Sprite mobSprite;
+    Tyra::Sprite mobSprite;  // Sprite sheet for all mobs
+    
+    int flashCounter;  // For invincibility flash effect
 };
 
 }  // namespace CanalUx
