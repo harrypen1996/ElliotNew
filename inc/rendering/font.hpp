@@ -23,7 +23,7 @@ public:
     void free(Tyra::TextureRepository* repository);
     void drawText(const char* text, int x, int y, Tyra::Color color);
     void drawText(const std::string& text, int x, int y, Tyra::Color color);
-    void drawTextWithShadow(const std::string& text, int x, int y, Tyra::Color color, Tyra::Color shadowColor);
+    void drawTextWithShadow(const std::string& text, int x, int y, Tyra::Color color, Tyra::Color shadowColor, float scale = 1.0f);
 
 private:
     static const int chars[FONT_CHAR_SIZE];

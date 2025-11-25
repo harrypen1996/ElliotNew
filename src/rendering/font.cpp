@@ -36,7 +36,7 @@ void Font::load(Tyra::TextureRepository* repository, Tyra::Renderer2D* renderer)
     float width = 16.0f;
 
     allFont.mode = Tyra::SpriteMode::MODE_REPEAT;
-    allFont.size = Tyra::Vec2(512, 256);  // Padded texture size
+    allFont.size = Tyra::Vec2(256, 128);  // 16 chars wide x 8 rows = 96 chars
 
     auto filepath = Tyra::FileUtils::fromCwd("earthboundFont.png");
     auto* texture = repository->add(filepath);
@@ -105,11 +105,81 @@ void Font::drawText(const std::string& text, int x, int y, Tyra::Color color) {
     }
 }
 
-void Font::drawTextWithShadow(const std::string& text, int x, int y, Tyra::Color color, Tyra::Color shadowColor) {
-    // Draw shadow (offset by 1 pixel down and right)
-    drawText(text, x + 1, y + 1, shadowColor);
+void Font::drawTextWithShadow(const std::string& text, int x, int y, Tyra::Color color, Tyra::Color shadowColor, float scale) {
+    if (!renderer2D) return;
+    
+    int shadowOffset = static_cast<int>(scale);
+    if (shadowOffset < 1) shadowOffset = 1;
+    
+    int sizeText = text.size();
+    
+    // Draw shadow first
+    int offsetY = 0;
+    int offsetX = 0;
+    
+    for (int i = 0; i < sizeText; i++) {
+        int charIndex = 0;
+        Tyra::Sprite fontSpr = font[0];
+
+        for (int j = 0; j < FONT_CHAR_SIZE; j++) {
+            if (text[i] == chars[j]) {
+                charIndex = j;
+                fontSpr = font[j];
+                fontSpr.color = shadowColor;
+                fontSpr.scale = scale;  // Use scale property
+                fontSpr.position = Tyra::Vec2(
+                    static_cast<float>(x + offsetX + shadowOffset), 
+                    static_cast<float>(y + offsetY + shadowOffset));
+                break;
+            }
+        }
+
+        if (text[i] == '\n') {
+            offsetY += static_cast<int>(18 * scale);
+            offsetX = 0;
+        } else {
+            if ((text[i] != ' ') && (text[i] != '\t')) {
+                renderer2D->render(fontSpr);
+                offsetX += static_cast<int>((charWidths[charIndex] + 2) * scale);
+            } else {
+                offsetX += static_cast<int>(6 * scale);
+            }
+        }
+    }
+    
     // Draw main text on top
-    drawText(text, x, y, color);
+    offsetY = 0;
+    offsetX = 0;
+    
+    for (int i = 0; i < sizeText; i++) {
+        int charIndex = 0;
+        Tyra::Sprite fontSpr = font[0];
+
+        for (int j = 0; j < FONT_CHAR_SIZE; j++) {
+            if (text[i] == chars[j]) {
+                charIndex = j;
+                fontSpr = font[j];
+                fontSpr.color = color;
+                fontSpr.scale = scale;  // Use scale property
+                fontSpr.position = Tyra::Vec2(
+                    static_cast<float>(x + offsetX), 
+                    static_cast<float>(y + offsetY));
+                break;
+            }
+        }
+
+        if (text[i] == '\n') {
+            offsetY += static_cast<int>(18 * scale);
+            offsetX = 0;
+        } else {
+            if ((text[i] != ' ') && (text[i] != '\t')) {
+                renderer2D->render(fontSpr);
+                offsetX += static_cast<int>((charWidths[charIndex] + 2) * scale);
+            } else {
+                offsetX += static_cast<int>(6 * scale);
+            }
+        }
+    }
 }
 
 }  // namespace CanalUx
