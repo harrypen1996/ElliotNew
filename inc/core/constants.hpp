@@ -79,7 +79,7 @@ namespace Sprites {
 // ============================================
 namespace Cheats {
     // God mode - player can't take damage
-    constexpr bool GOD_MODE = true;
+    constexpr bool GOD_MODE = false;
     
     // Massive damage - one-shot everything
     constexpr bool ONE_HIT_KILLS = false;

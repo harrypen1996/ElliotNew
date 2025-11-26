@@ -126,7 +126,7 @@ void Game::handleInput() {
             // Debug: Circle to reset level
             if (engine->pad.getPressed().Circle) {
                 TYRA_LOG("CanalUx: Resetting level...");
-                initLevel(currentLevelNumber);
+                startNewGame();
             }
             break;
             

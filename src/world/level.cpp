@@ -244,10 +244,14 @@ void Level::generateRoomTiles() {
             
             switch (room.getType()) {
                 case RoomType::START:
-                case RoomType::BOSS:
-                    // Fixed size for important rooms (screen size)
+                    // Fixed size for start room (screen size)
                     width = Constants::ROOM_MIN_WIDTH;
                     height = Constants::ROOM_MIN_HEIGHT;
+                    break;
+                case RoomType::BOSS:
+                    // Larger arena for boss fights
+                    width = Constants::BOSS_ROOM_WIDTH;
+                    height = Constants::BOSS_ROOM_HEIGHT;
                     break;
                 case RoomType::SHOP:
                 case RoomType::SPECIAL:
