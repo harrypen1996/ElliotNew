@@ -45,7 +45,17 @@ enum class MobState {
     PIKE_TAIL_SWEEP,    // Tail cleave attack
     PIKE_LEAP,          // Leaps out of water, crashes down
     PIKE_SUBMERGED,     // Hidden underwater, ripples visible
-    PIKE_EMERGING       // Bursting up from water
+    PIKE_EMERGING,      // Bursting up from water
+    
+    // Lock Keeper-specific states
+    LOCKKEEPER_WALKING,     // Walking along top edge
+    LOCKKEEPER_WINDUP,      // Raising arms for slam
+    LOCKKEEPER_SLAM,        // Slamming down - ring expanding
+    LOCKKEEPER_THROW_WINDUP,// Winding up to throw trolley
+    LOCKKEEPER_THROWING,    // Throwing trolley
+    LOCKKEEPER_STUNNED,     // Brief recovery after attack
+    LOCKKEEPER_SHOT_AIM,    // Aiming warning shot at player
+    LOCKKEEPER_SHOT_FIRE    // Firing the shot
 };
 
 class MobManager {
@@ -94,6 +104,17 @@ public:
         int attackPattern;       // Which attack in the pattern
         int phase;               // Boss phase (changes behavior at health thresholds)
         float tailSweepAngle;    // Angle for tail sweep attack
+        
+        // Lock Keeper boss specific
+        float ringRadius;        // Current radius of shockwave ring
+        float ringThickness;     // Width of the ring
+        Tyra::Vec2 slamPosition; // Center of slam attack
+        Tyra::Vec2 trolleyTarget;// Where trolley will land
+        float trolleyProgress;   // 0-1 flight progress
+        int trolleysThrown;      // Count of trolleys thrown this fight
+        Tyra::Vec2 shotDirection;// Direction of warning shot
+        Tyra::Vec2 shotPosition; // Current position of warning shot projectile
+        float shotSpeed;         // Current speed of shot (accelerates)
         
         // For rendering
         bool facingRight;

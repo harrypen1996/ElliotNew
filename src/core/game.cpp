@@ -123,9 +123,8 @@ void Game::handleInput() {
             if (engine->pad.getPressed().Start) {
                 setState(GameState::PAUSED);
             }
-            // Debug: Circle to reset level
+            // Debug: Circle to reset game
             if (engine->pad.getPressed().Cross) {
-                TYRA_LOG("CanalUx: Resetting level...");
                 startNewGame();
             }
             break;
@@ -297,9 +296,9 @@ void Game::render() {
                 // Render room tiles
                 roomRenderer.render(&renderer.renderer2D, room, &camera);
                 
-                // Render entities (projectiles, mobs, player)
+                // Render entities (projectiles, mobs, player) and room obstacles
                 entityRenderer.render(&renderer.renderer2D, &camera, 
-                                      player.get(), &projectileManager, &mobManager);
+                                      player.get(), &projectileManager, &mobManager, room);
                 
                 // Render HUD
                 hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
@@ -316,7 +315,7 @@ void Game::render() {
                 Room* room = currentLevel->getCurrentRoom();
                 roomRenderer.render(&renderer.renderer2D, room, &camera);
                 entityRenderer.render(&renderer.renderer2D, &camera, 
-                                      player.get(), &projectileManager, &mobManager);
+                                      player.get(), &projectileManager, &mobManager, room);
                 hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
                 
                 // TODO: Render "GAME OVER - Press X to restart" text overlay
@@ -329,7 +328,7 @@ void Game::render() {
                 Room* room = currentLevel->getCurrentRoom();
                 roomRenderer.render(&renderer.renderer2D, room, &camera);
                 entityRenderer.render(&renderer.renderer2D, &camera, 
-                                      player.get(), &projectileManager, &mobManager);
+                                      player.get(), &projectileManager, &mobManager, room);
                 hudRenderer.render(&renderer.renderer2D, player.get(), currentLevel.get());
                 
                 // TODO: Render "VICTORY! - Press X to play again" text overlay

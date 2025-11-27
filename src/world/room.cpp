@@ -4,12 +4,17 @@
 
 #include "world/room.hpp"
 #include "world/room_generator.hpp"
+#include <cmath>
 
 namespace CanalUx {
 
 Room::Room()
     : width(0),
       height(0),
+      arenaMinX(0),
+      arenaMaxX(0),
+      arenaMinY(0),
+      arenaMaxY(0),
       openLeft(false),
       openRight(false),
       openTop(false),
@@ -27,6 +32,9 @@ Room::~Room() {
 void Room::generate(RoomGenerator* generator, int w, int h) {
     width = w;
     height = h;
+    
+    // Initialize arena bounds to full room (minus walls)
+    resetArenaBounds();
     
     // Start and shop rooms are pre-cleared (no enemies)
     if (type == RoomType::START || type == RoomType::SHOP) {
@@ -111,6 +119,57 @@ void Room::setSceneryTile(int x, int y, int tileId) {
     if (y >= 0 && y < height && x >= 0 && x < width) {
         sceneryMap[y][x] = tileId;
     }
+}
+
+void Room::addObstacle(const RoomObstacle& obstacle) {
+    obstacles.push_back(obstacle);
+}
+
+void Room::clearObstacles() {
+    obstacles.clear();
+}
+
+bool Room::hasObstacleAt(float x, float y) const {
+    for (const auto& obs : obstacles) {
+        if (obs.blocksMovement) {
+            // Check if position is within obstacle bounds (assume 1 tile size)
+            float dx = x - obs.position.x;
+            float dy = y - obs.position.y;
+            if (dx >= 0 && dx < 1.0f && dy >= 0 && dy < 1.0f) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void Room::shrinkArena(float amount) {
+    // Shrink from all sides
+    arenaMinX += amount;
+    arenaMaxX -= amount;
+    arenaMinY += amount;
+    arenaMaxY -= amount;
+    
+    // Don't shrink below minimum playable size
+    float minSize = 4.0f;
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    
+    if (arenaMaxX - arenaMinX < minSize) {
+        arenaMinX = centerX - minSize / 2.0f;
+        arenaMaxX = centerX + minSize / 2.0f;
+    }
+    if (arenaMaxY - arenaMinY < minSize) {
+        arenaMinY = centerY - minSize / 2.0f;
+        arenaMaxY = centerY + minSize / 2.0f;
+    }
+}
+
+void Room::resetArenaBounds() {
+    arenaMinX = 2.0f;
+    arenaMaxX = static_cast<float>(width) - 2.0f;
+    arenaMinY = 2.0f;
+    arenaMaxY = static_cast<float>(height) - 2.0f;
 }
 
 Tyra::Vec2 Room::getSpawnPoint(int entryDirection) const {

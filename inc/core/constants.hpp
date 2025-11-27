@@ -85,7 +85,7 @@ namespace Cheats {
     constexpr bool ONE_HIT_KILLS = false;
     
     // Start at specific level (0 = normal, 1-3 = skip to that level)
-    constexpr int START_LEVEL = 1;
+    constexpr int START_LEVEL = 2;
     
     // Rooms start cleared (no enemies, doors open)
     constexpr bool ROOMS_PRE_CLEARED = false;

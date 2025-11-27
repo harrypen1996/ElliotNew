@@ -24,6 +24,16 @@ enum class RoomType {
 };
 
 /**
+ * Obstacle placed during gameplay (e.g., trolley from Lock Keeper)
+ */
+struct RoomObstacle {
+    Tyra::Vec2 position;  // Tile position
+    int type;             // Obstacle type (0 = trolley, etc.)
+    bool blocksMovement;
+    bool blocksBullets;
+};
+
+/**
  * A single room in the canal level
  * Contains tile maps for water, land, and scenery layers
  */
@@ -42,6 +52,20 @@ public:
     int getWaterTile(int x, int y) const;
     int getSceneryTile(int x, int y) const;
     void setSceneryTile(int x, int y, int tileId);
+    
+    // Dynamic obstacles (runtime)
+    void addObstacle(const RoomObstacle& obstacle);
+    void clearObstacles();
+    const std::vector<RoomObstacle>& getObstacles() const { return obstacles; }
+    bool hasObstacleAt(float x, float y) const;
+    
+    // Arena shrinking (for Lock Keeper boss)
+    void shrinkArena(float amount);  // Shrink from edges
+    float getArenaMinX() const { return arenaMinX; }
+    float getArenaMaxX() const { return arenaMaxX; }
+    float getArenaMinY() const { return arenaMinY; }
+    float getArenaMaxY() const { return arenaMaxY; }
+    void resetArenaBounds();
 
     // Map access
     const std::vector<std::vector<int>>& getLandMap() const { return landMap; }
@@ -77,6 +101,15 @@ private:
     std::vector<std::vector<int>> landMap;
     std::vector<std::vector<int>> waterMap;
     std::vector<std::vector<int>> sceneryMap;
+    
+    // Dynamic obstacles
+    std::vector<RoomObstacle> obstacles;
+    
+    // Arena bounds (can shrink during boss fights)
+    float arenaMinX;
+    float arenaMaxX;
+    float arenaMinY;
+    float arenaMaxY;
 
     // Dimensions
     int width;

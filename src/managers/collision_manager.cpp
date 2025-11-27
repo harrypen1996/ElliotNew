@@ -123,8 +123,10 @@ void CollisionManager::checkProjectilePlayerCollisions(ProjectileManager* projec
                             Constants::PROJECTILE_SIZE / Constants::TILE_SIZE);
         
         if (checkAABB(projectile.position, projSize, player->position, playerSize)) {
-            // Player hit by enemy projectile
-            player->takeDamage(1);
+            // Player hit by enemy projectile - use projectile's damage value
+            int damage = static_cast<int>(projectile.getDamage());
+            if (damage < 1) damage = 1;  // Minimum 1 damage
+            player->takeDamage(damage);
             projectile.destroy();
         }
     }

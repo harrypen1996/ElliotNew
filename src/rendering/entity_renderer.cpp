@@ -7,6 +7,7 @@
 #include "entities/player.hpp"
 #include "managers/projectile_manager.hpp"
 #include "managers/mob_manager.hpp"
+#include "world/room.hpp"
 #include <cmath>
 
 namespace CanalUx {
@@ -69,6 +70,22 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     shadowSprite.size = Tyra::Vec2(128.0f, 64.0f);
     shadowTexture->addLink(shadowSprite.id);
     
+    // Load Lock Keeper boss sprite (256x256 placeholder)
+    filepath = Tyra::FileUtils::fromCwd("lockkeeper_placeholder.png");
+    auto* lockKeeperTexture = textureRepo->add(filepath);
+    
+    lockKeeperSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    lockKeeperSprite.size = Tyra::Vec2(256.0f, 256.0f);
+    lockKeeperTexture->addLink(lockKeeperSprite.id);
+    
+    // Ring attack uses projectiles now - no ring sprite needed
+    
+    // Trolley uses the same mobs sprite sheet (row 3, y=192)
+    // Just link to the same texture as mobSprite
+    trolleySprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+    trolleySprite.size = Tyra::Vec2(64.0f, 64.0f);
+    trolleySprite.id = mobSprite.id;  // Share texture with mob sprite sheet
+    
     TYRA_LOG("EntityRenderer: Initialized");
 }
 
@@ -79,14 +96,21 @@ void EntityRenderer::cleanup(Tyra::TextureRepository* textureRepo) {
     textureRepo->freeBySprite(submergedSprite);
     textureRepo->freeBySprite(pikeSprite);
     textureRepo->freeBySprite(shadowSprite);
+    textureRepo->freeBySprite(lockKeeperSprite);
+    // Note: trolleySprite shares texture with mobSprite, don't free separately
+    // Note: ringSprite no longer used - ring attack uses projectiles
 }
 
 void EntityRenderer::render(Tyra::Renderer2D* renderer, 
                             const Camera* camera,
                             const Player* player,
                             const ProjectileManager* projectileManager,
-                            const MobManager* mobManager) {
-    // Render order: projectiles, mobs, then player (player on top)
+                            const MobManager* mobManager,
+                            const Room* room) {
+    // Render order: obstacles, projectiles, mobs, then player (player on top)
+    if (room) {
+        renderRoomObstacles(renderer, camera, room);
+    }
     renderProjectiles(renderer, camera, projectileManager);
     renderMobs(renderer, camera, mobManager);
     renderPlayer(renderer, camera, player);
@@ -182,6 +206,12 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         // Handle Pike boss specially
         if (mob.type == MobType::BOSS_PIKE) {
             renderPikeBoss(renderer, mob, screenPos);
+            continue;
+        }
+        
+        // Handle Lock Keeper boss specially
+        if (mob.type == MobType::BOSS_LOCKKEEPER) {
+            renderLockKeeperBoss(renderer, mob, screenPos, nullptr);
             continue;
         }
         
@@ -396,6 +426,138 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
     sprite.scale = scale;
     
     renderer->render(sprite);
+}
+
+void EntityRenderer::renderLockKeeperBoss(Tyra::Renderer2D* renderer, 
+                                           const MobManager::MobData& lk, 
+                                           const Tyra::Vec2& screenPos,
+                                           const Room* room) {
+    (void)room;  // Unused for now
+    
+    // Lock Keeper sprite - placeholder is 256x256
+    Tyra::Sprite sprite;
+    sprite.id = lockKeeperSprite.id;
+    sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    sprite.position = screenPos;
+    sprite.size = Tyra::Vec2(256.0f, 256.0f);
+    sprite.scale = 0.5f;  // Scale down to ~128x128 on screen
+    
+    // Animate based on state
+    float wiggleX = 0.0f;
+    float scaleModifier = 1.0f;
+    
+    switch (lk.state) {
+        case MobState::LOCKKEEPER_WALKING:
+            // Slight bob while walking
+            wiggleX = std::sin(lk.stateTimer * 0.15f) * 3.0f;
+            break;
+            
+        case MobState::LOCKKEEPER_WINDUP:
+            // Shake while winding up
+            wiggleX = std::sin(lk.stateTimer * 0.5f) * (lk.stateTimer / 10.0f);
+            // Grow slightly
+            scaleModifier = 1.0f + (lk.stateTimer / 45.0f) * 0.1f;
+            break;
+            
+        case MobState::LOCKKEEPER_SLAM:
+            // Compressed during slam
+            scaleModifier = 0.9f;
+            break;
+            
+        case MobState::LOCKKEEPER_THROW_WINDUP:
+            // Lean back
+            wiggleX = -5.0f - lk.stateTimer * 0.2f;
+            break;
+            
+        case MobState::LOCKKEEPER_THROWING:
+            // Lean forward
+            wiggleX = 10.0f;
+            break;
+            
+        case MobState::LOCKKEEPER_STUNNED:
+            // Slight wobble
+            wiggleX = std::sin(lk.stateTimer * 0.3f) * 2.0f;
+            scaleModifier = 0.95f;
+            break;
+            
+        default:
+            break;
+    }
+    
+    sprite.position.x += wiggleX;
+    sprite.scale *= scaleModifier;
+    
+    // Flip sprite based on facing direction
+    if (!lk.facingRight) {
+        sprite.flipHorizontal = true;
+    }
+    
+    renderer->render(sprite);
+    
+    // Ring attack now uses projectiles instead of sprite - no ring rendering needed
+    
+    // Render flying trolley during throw
+    if (lk.state == MobState::LOCKKEEPER_THROWING) {
+        // Trolley flies in an arc from boss to target
+        Tyra::Sprite trolley;
+        trolley.id = trolleySprite.id;
+        trolley.mode = Tyra::SpriteMode::MODE_REPEAT;
+        trolley.size = Tyra::Vec2(64.0f, 64.0f);
+        trolley.offset = Tyra::Vec2(0.0f, 192.0f);  // Row 3 in mobs sheet
+        trolley.scale = 0.75f;
+        
+        // Interpolate position
+        float t = lk.trolleyProgress;
+        float startX = screenPos.x + 64.0f;
+        float startY = screenPos.y + 32.0f;
+        
+        // Target position - need to convert from world coords
+        // Approximate: target is somewhere in the arena
+        float targetX = startX + (lk.trolleyTarget.x - lk.position.x) * Constants::TILE_SIZE;
+        float targetY = startY + (lk.trolleyTarget.y - lk.position.y) * Constants::TILE_SIZE;
+        
+        // Linear interpolation with arc
+        trolley.position.x = startX + (targetX - startX) * t;
+        float arcHeight = std::sin(t * 3.14159f) * 80.0f;  // Arc up then down
+        trolley.position.y = startY + (targetY - startY) * t - arcHeight;
+        
+        renderer->render(trolley);
+        
+        // Render shadow below trolley
+        Tyra::Sprite shadow;
+        shadow.id = shadowSprite.id;
+        shadow.mode = Tyra::SpriteMode::MODE_STRETCH;
+        shadow.size = Tyra::Vec2(64.0f, 32.0f);
+        shadow.position.x = trolley.position.x;
+        shadow.position.y = startY + (targetY - startY) * t + 20.0f;  // On ground
+        shadow.scale = 0.3f + 0.4f * std::sin(t * 3.14159f);
+        shadow.color = Tyra::Color(30, 30, 30, 80);
+        
+        renderer->render(shadow);
+    }
+}
+
+void EntityRenderer::renderRoomObstacles(Tyra::Renderer2D* renderer, 
+                                          const Camera* camera, 
+                                          const Room* room) {
+    if (!room || !camera) return;
+    
+    for (const auto& obstacle : room->getObstacles()) {
+        Tyra::Vec2 screenPos = camera->worldToScreen(obstacle.position);
+        
+        // Render based on obstacle type
+        if (obstacle.type == 0) {  // Trolley
+            Tyra::Sprite sprite;
+            sprite.id = trolleySprite.id;
+            sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+            sprite.size = Tyra::Vec2(64.0f, 64.0f);
+            sprite.offset = Tyra::Vec2(0.0f, 192.0f);  // Row 3 in mobs sheet
+            sprite.position = screenPos;
+            sprite.scale = 1.0f;
+            
+            renderer->render(sprite);
+        }
+    }
 }
 
 }  // namespace CanalUx

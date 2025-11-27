@@ -727,9 +727,274 @@ void MobManager::updatePikeBoss(MobData& mob, Room* room, Player* player, Projec
 }
 
 void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
-    // TODO: Level 2 boss - Lock Keeper
-    // For now, use generic boss behavior
-    updateBoss(mob, room, player, projectileManager);
+    /*
+     * LOCK KEEPER BOSS - Level 2
+     * 
+     * A canal lock keeper who walks along the TOP of the arena.
+     * Player is in the water below.
+     * 
+     * ATTACKS:
+     * 1. Slam - Raises arms, slams down creating expanding shockwave ring
+     *    - Player MUST submerge to dodge (instant kill if not submerged when ring hits)
+     * 2. Trolley Throw - Throws shopping trolley that lands as permanent obstacle
+     * 
+     * MECHANICS:
+     * - Lock Keeper walks left/right along top edge
+     * - Arena shrinks over time (walls close in)
+     * - Trolleys reduce playable area
+     * 
+     * PHASES:
+     * Phase 1 (100-60% HP): Slow, mostly slams
+     * Phase 2 (60-30% HP): Faster, adds trolley throws
+     * Phase 3 (<30% HP): Very fast, frequent attacks, arena shrinks faster
+     */
+    
+    float roomWidth = static_cast<float>(room->getWidth());
+    float roomHeight = static_cast<float>(room->getHeight());
+    
+    // Lock Keeper stays at top of room (y = 1)
+    const float bossY = 1.5f;
+    mob.position.y = bossY;
+    
+    // Player distance (horizontal only since boss is at top)
+    float dx = player->position.x - mob.position.x;
+    float distX = std::abs(dx);
+    
+    // Update phase based on health
+    float healthPercent = mob.health / mob.maxHealth;
+    if (healthPercent <= 0.3f) {
+        mob.phase = 3;
+    } else if (healthPercent <= 0.6f) {
+        mob.phase = 2;
+    } else {
+        mob.phase = 1;
+    }
+    
+    // Facing direction
+    mob.facingRight = dx > 0;
+    
+    // Speed increases with phase
+    float walkSpeed = 0.03f + (mob.phase - 1) * 0.015f;
+    
+    mob.stateTimer++;
+    if (mob.actionCooldown > 0) mob.actionCooldown--;
+    
+    switch (mob.state) {
+        case MobState::LOCKKEEPER_WALKING: {
+            // Walk along top edge, tracking player
+            if (dx > 1.0f) {
+                mob.position.x += walkSpeed;
+            } else if (dx < -1.0f) {
+                mob.position.x -= walkSpeed;
+            }
+            
+            // Clamp to room bounds
+            mob.position.x = std::max(3.0f, std::min(mob.position.x, roomWidth - 4.0f));
+            
+            // Decide on attack
+            if (mob.actionCooldown <= 0 && distX < 10.0f) {
+                int attackRoll = rand() % 100;
+                
+                // Phase 1: 50% slam, 30% shot, 20% cooldown
+                // Phase 2: 40% slam, 30% shot, 25% trolley, 5% cooldown
+                // Phase 3: 35% slam, 35% shot, 28% trolley, 2% cooldown
+                int slamChance = 50 - (mob.phase - 1) * 7;      // 50, 43, 35
+                int shotChance = 30 + (mob.phase - 1) * 2;      // 30, 32, 35
+                int trolleyChance = (mob.phase >= 2) ? 25 + (mob.phase - 2) * 3 : 0;  // 0, 25, 28
+                
+                if (attackRoll < slamChance) {
+                    mob.state = MobState::LOCKKEEPER_WINDUP;
+                    mob.stateTimer = 0;
+                    // Slam expands from bottom of boss sprite
+                    mob.slamPosition.x = mob.position.x + 2.0f;
+                    mob.slamPosition.y = mob.position.y + 4.0f;
+                } else if (attackRoll < slamChance + shotChance) {
+                    // Warning shot - aim at player
+                    mob.state = MobState::LOCKKEEPER_SHOT_AIM;
+                    mob.stateTimer = 0;
+                    // Calculate direction to player
+                    float aimDx = player->position.x - mob.position.x;
+                    float aimDy = player->position.y - mob.position.y;
+                    float aimLen = std::sqrt(aimDx * aimDx + aimDy * aimDy);
+                    if (aimLen > 0.0f) {
+                        mob.shotDirection.x = aimDx / aimLen;
+                        mob.shotDirection.y = aimDy / aimLen;
+                    } else {
+                        mob.shotDirection.x = 0.0f;
+                        mob.shotDirection.y = 1.0f;
+                    }
+                    // Shot starts at bottom center of boss
+                    mob.shotPosition.x = mob.position.x + 2.0f;
+                    mob.shotPosition.y = mob.position.y + 4.0f;
+                    mob.shotSpeed = 0.02f;  // Start slow
+                } else if (attackRoll < slamChance + shotChance + trolleyChance && mob.trolleysThrown < 6) {
+                    mob.state = MobState::LOCKKEEPER_THROW_WINDUP;
+                    mob.stateTimer = 0;
+                    // Target somewhere in the arena
+                    mob.trolleyTarget.x = room->getArenaMinX() + 2.0f + 
+                        static_cast<float>(rand() % static_cast<int>(room->getArenaMaxX() - room->getArenaMinX() - 4.0f));
+                    mob.trolleyTarget.y = room->getArenaMinY() + 2.0f +
+                        static_cast<float>(rand() % static_cast<int>(room->getArenaMaxY() - room->getArenaMinY() - 4.0f));
+                } else {
+                    // Brief cooldown - shorter now
+                    mob.actionCooldown = 15;
+                }
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_WINDUP: {
+            // Arms raising - telegraph for player to prepare
+            if (mob.stateTimer >= 45) {  // ~0.75 seconds warning
+                mob.state = MobState::LOCKKEEPER_SLAM;
+                mob.stateTimer = 0;
+                mob.ringRadius = 0.0f;
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_SLAM: {
+            // Expanding ring of projectiles
+            float ringSpeed = 0.12f + mob.phase * 0.02f;  // Speed in tiles per frame
+            mob.ringRadius += ringSpeed;
+            
+            // Spawn projectiles in a ring pattern every few frames
+            if (static_cast<int>(mob.stateTimer) % 3 == 0 && mob.ringRadius > 0.5f) {
+                // Number of projectiles in the ring increases as it expands
+                int numProjectiles = 16 + static_cast<int>(mob.ringRadius * 2);
+                if (numProjectiles > 48) numProjectiles = 48;  // Cap it
+                
+                for (int i = 0; i < numProjectiles; i++) {
+                    float angle = (6.28318f / numProjectiles) * i;
+                    
+                    // Position projectile on the ring
+                    Tyra::Vec2 projPos;
+                    projPos.x = mob.slamPosition.x + std::cos(angle) * mob.ringRadius;
+                    projPos.y = mob.slamPosition.y + std::sin(angle) * mob.ringRadius;
+                    
+                    // Projectiles move outward with the ring
+                    Tyra::Vec2 projVel;
+                    projVel.x = std::cos(angle) * ringSpeed;
+                    projVel.y = std::sin(angle) * ringSpeed;
+                    
+                    // Spawn as enemy projectile with 999 damage (instant kill)
+                    // Player must submerge to avoid
+                    projectileManager->spawnEnemyProjectile(projPos, projVel, 999.0f);
+                }
+            }
+            
+            // Ring dissipates after reaching edges
+            float maxRadius = std::max(roomWidth, roomHeight);
+            if (mob.ringRadius > maxRadius) {
+                mob.state = MobState::LOCKKEEPER_STUNNED;
+                mob.stateTimer = 0;
+                mob.ringRadius = 0.0f;
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_THROW_WINDUP: {
+            // Winding up to throw trolley
+            if (mob.stateTimer >= 30) {
+                mob.state = MobState::LOCKKEEPER_THROWING;
+                mob.stateTimer = 0;
+                mob.trolleyProgress = 0.0f;
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_THROWING: {
+            // Trolley flying through air
+            mob.trolleyProgress += 0.025f;  // Takes ~40 frames to land
+            
+            if (mob.trolleyProgress >= 1.0f) {
+                // Trolley lands - add obstacle to room
+                RoomObstacle trolley;
+                trolley.position = mob.trolleyTarget;
+                trolley.type = 0;  // Trolley type
+                trolley.blocksMovement = true;
+                trolley.blocksBullets = true;
+                room->addObstacle(trolley);
+                
+                mob.trolleysThrown++;
+                
+                // Shrink arena slightly each trolley (phase 2+)
+                if (mob.phase >= 2) {
+                    room->shrinkArena(0.25f);
+                }
+                
+                mob.state = MobState::LOCKKEEPER_STUNNED;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_STUNNED: {
+            // Recovery after attack - shorter now
+            int recoveryTime = 45 - (mob.phase - 1) * 10;  // 45, 35, 25 frames
+            if (mob.stateTimer >= recoveryTime) {
+                mob.state = MobState::LOCKKEEPER_WALKING;
+                mob.stateTimer = 0;
+                mob.actionCooldown = 20 - mob.phase * 4;  // 16, 12, 8 frames
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_SHOT_AIM: {
+            // Aiming at player - telegraph with visible projectile
+            // Spawn slow-moving projectiles in aim direction as warning
+            if (static_cast<int>(mob.stateTimer) % 8 == 0) {
+                // Spawn a warning projectile (moves slowly in aim direction)
+                Tyra::Vec2 projPos = mob.shotPosition;
+                Tyra::Vec2 projVel;
+                projVel.x = mob.shotDirection.x * 0.03f;
+                projVel.y = mob.shotDirection.y * 0.03f;
+                projectileManager->spawnEnemyProjectile(projPos, projVel, 999.0f);
+            }
+            
+            // After aiming time, fire the real shot
+            int aimTime = 40 - (mob.phase - 1) * 8;  // 40, 32, 24 frames
+            if (mob.stateTimer >= aimTime) {
+                mob.state = MobState::LOCKKEEPER_SHOT_FIRE;
+                mob.stateTimer = 0;
+                mob.shotSpeed = 0.05f;  // Initial speed
+            }
+            break;
+        }
+        
+        case MobState::LOCKKEEPER_SHOT_FIRE: {
+            // Fire rapid accelerating projectiles
+            mob.shotSpeed += 0.008f;  // Accelerate
+            if (mob.shotSpeed > 0.35f) mob.shotSpeed = 0.35f;  // Cap speed
+            
+            // Spawn projectiles rapidly
+            if (static_cast<int>(mob.stateTimer) % 2 == 0) {
+                Tyra::Vec2 projPos = mob.shotPosition;
+                Tyra::Vec2 projVel;
+                projVel.x = mob.shotDirection.x * mob.shotSpeed;
+                projVel.y = mob.shotDirection.y * mob.shotSpeed;
+                projectileManager->spawnEnemyProjectile(projPos, projVel, 999.0f);
+            }
+            
+            // Fire for a duration then stop
+            int fireTime = 30 + mob.phase * 10;  // 40, 50, 60 frames
+            if (mob.stateTimer >= fireTime) {
+                mob.state = MobState::LOCKKEEPER_STUNNED;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        default:
+            mob.state = MobState::LOCKKEEPER_WALKING;
+            mob.stateTimer = 0;
+            break;
+    }
+    
+    // Phase 3: Arena shrinks over time
+    if (mob.phase >= 3 && static_cast<int>(mob.stateTimer) % 300 == 0 && mob.stateTimer > 0) {  // Every ~5 seconds
+        room->shrinkArena(0.1f);
+    }
 }
 
 void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
