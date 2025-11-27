@@ -215,6 +215,10 @@ void MobManager::update(Room* currentRoom, Player* player, ProjectileManager* pr
                 updateDuck(mob, currentRoom, player);
                 break;
         }
+        
+        // Apply velocity - CollisionManager will resolve collisions
+        mob.position.x += mob.velocity.x;
+        mob.position.y += mob.velocity.y;
     }
     
     // Apply repulsion between mobs so they don't overlap
@@ -235,19 +239,12 @@ void MobManager::updateDuck(MobData& mob, Room* room, Player* player) {
     float distance = std::sqrt(dx * dx + dy * dy);
     
     if (distance > 0.5f) {
-        // Move towards player
-        float vx = (dx / distance) * mob.speed;
-        float vy = (dy / distance) * mob.speed;
-        
-        float newX = mob.position.x + vx;
-        float newY = mob.position.y + vy;
-        
-        if (canMoveTo(mob, newX, mob.position.y, room)) {
-            mob.position.x = newX;
-        }
-        if (canMoveTo(mob, mob.position.x, newY, room)) {
-            mob.position.y = newY;
-        }
+        // Set velocity towards player - CollisionManager handles the rest
+        mob.velocity.x = (dx / distance) * mob.speed;
+        mob.velocity.y = (dy / distance) * mob.speed;
+    } else {
+        mob.velocity.x = 0;
+        mob.velocity.y = 0;
     }
 }
 
@@ -261,32 +258,16 @@ void MobManager::updateSwan(MobData& mob, Room* room, Player* player, Projectile
     
     if (distance < preferredDistance - 1.0f) {
         // Too close - back away
-        float vx = -(dx / distance) * mob.speed;
-        float vy = -(dy / distance) * mob.speed;
-        
-        float newX = mob.position.x + vx;
-        float newY = mob.position.y + vy;
-        
-        if (canMoveTo(mob, newX, mob.position.y, room)) {
-            mob.position.x = newX;
-        }
-        if (canMoveTo(mob, mob.position.x, newY, room)) {
-            mob.position.y = newY;
-        }
+        mob.velocity.x = -(dx / distance) * mob.speed;
+        mob.velocity.y = -(dy / distance) * mob.speed;
     } else if (distance > preferredDistance + 2.0f) {
         // Too far - move closer slowly
-        float vx = (dx / distance) * mob.speed * 0.5f;
-        float vy = (dy / distance) * mob.speed * 0.5f;
-        
-        float newX = mob.position.x + vx;
-        float newY = mob.position.y + vy;
-        
-        if (canMoveTo(mob, newX, mob.position.y, room)) {
-            mob.position.x = newX;
-        }
-        if (canMoveTo(mob, mob.position.x, newY, room)) {
-            mob.position.y = newY;
-        }
+        mob.velocity.x = (dx / distance) * mob.speed * 0.5f;
+        mob.velocity.y = (dy / distance) * mob.speed * 0.5f;
+    } else {
+        // Good distance - stop
+        mob.velocity.x = 0;
+        mob.velocity.y = 0;
     }
     
     // Shoot at player when cooldown is ready
@@ -318,6 +299,8 @@ void MobManager::updateFrog(MobData& mob, Room* room, Player* player) {
     switch (mob.state) {
         case MobState::IDLE:
             // Wait for cooldown then start jump
+            mob.velocity.x = 0;
+            mob.velocity.y = 0;
             if (mob.actionCooldown <= 0) {
                 mob.state = MobState::JUMPING;
                 mob.stateTimer = 0;
@@ -345,13 +328,12 @@ void MobManager::updateFrog(MobData& mob, Room* room, Player* player) {
                 float jdist = std::sqrt(jdx * jdx + jdy * jdy);
                 
                 if (jdist > 0.2f && mob.stateTimer < 30) {
-                    float vx = (jdx / jdist) * mob.speed;
-                    float vy = (jdy / jdist) * mob.speed;
-                    
-                    mob.position.x += vx;
-                    mob.position.y += vy;
+                    mob.velocity.x = (jdx / jdist) * mob.speed;
+                    mob.velocity.y = (jdy / jdist) * mob.speed;
                 } else {
                     // Land and submerge
+                    mob.velocity.x = 0;
+                    mob.velocity.y = 0;
                     mob.state = MobState::SUBMERGED;
                     mob.stateTimer = 0;
                     mob.submerged = true;
@@ -361,6 +343,8 @@ void MobManager::updateFrog(MobData& mob, Room* room, Player* player) {
             
         case MobState::SUBMERGED:
             // Stay submerged for a bit (invulnerable during this time could be added)
+            mob.velocity.x = 0;
+            mob.velocity.y = 0;
             if (mob.stateTimer > 45) {
                 mob.state = MobState::SURFACING;
                 mob.stateTimer = 0;
@@ -369,6 +353,8 @@ void MobManager::updateFrog(MobData& mob, Room* room, Player* player) {
             
         case MobState::SURFACING:
             // Surface animation
+            mob.velocity.x = 0;
+            mob.velocity.y = 0;
             mob.submerged = false;
             if (mob.stateTimer > 15) {
                 mob.state = MobState::IDLE;
@@ -391,18 +377,11 @@ void MobManager::updateBoss(MobData& mob, Room* room, Player* player, Projectile
     
     // Chase player
     if (distance > 2.0f) {
-        float vx = (dx / distance) * mob.speed;
-        float vy = (dy / distance) * mob.speed;
-        
-        float newX = mob.position.x + vx;
-        float newY = mob.position.y + vy;
-        
-        if (canMoveTo(mob, newX, mob.position.y, room)) {
-            mob.position.x = newX;
-        }
-        if (canMoveTo(mob, mob.position.x, newY, room)) {
-            mob.position.y = newY;
-        }
+        mob.velocity.x = (dx / distance) * mob.speed;
+        mob.velocity.y = (dy / distance) * mob.speed;
+    } else {
+        mob.velocity.x = 0;
+        mob.velocity.y = 0;
     }
     
     // Shoot spread of projectiles periodically
@@ -1027,24 +1006,6 @@ void MobManager::applyMobRepulsion() {
             }
         }
     }
-}
-
-bool MobManager::canMoveTo(MobData& mob, float x, float y, Room* room) {
-    float sizeInTiles = mob.size.x / Constants::TILE_SIZE;
-    
-    // Check corners
-    int x1 = static_cast<int>(x);
-    int y1 = static_cast<int>(y);
-    int x2 = static_cast<int>(x + sizeInTiles * 0.9f);
-    int y2 = static_cast<int>(y + sizeInTiles * 0.9f);
-    
-    // Check land tiles (walls)
-    if (room->getLandTile(x1, y1) != 0 || room->getLandTile(x2, y1) != 0 ||
-        room->getLandTile(x1, y2) != 0 || room->getLandTile(x2, y2) != 0) {
-        return false;
-    }
-    
-    return true;
 }
 
 void MobManager::clear() {

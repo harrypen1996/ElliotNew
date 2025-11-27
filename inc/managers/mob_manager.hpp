@@ -8,6 +8,7 @@
 #include <vector>
 #include <tyra>
 #include "core/constants.hpp"
+#include "entities/entity.hpp"
 
 namespace CanalUx {
 
@@ -65,7 +66,7 @@ public:
     // Spawning
     void spawnMobsForRoom(Room* room, int levelNumber);
     
-    // Update all mobs
+    // Update all mobs (AI sets velocity, CollisionManager resolves collisions)
     void update(Room* currentRoom, Player* player, ProjectileManager* projectileManager);
 
     // Clear all mobs (e.g., on room change)
@@ -77,17 +78,13 @@ public:
     // Get mob count
     int getMobCount() const { return static_cast<int>(mobs.size()); }
 
-    // Access for collision checking and rendering
-    struct MobData {
-        Tyra::Vec2 position;
-        Tyra::Vec2 velocity;
-        Tyra::Vec2 size;
+    // MobData extends Entity with mob-specific data
+    struct MobData : public Entity {
         float health;
         float maxHealth;
         float speed;
         MobType type;
         MobState state;
-        bool active;
         
         // Behavior timers
         float stateTimer;      // Time in current state
@@ -117,8 +114,16 @@ public:
         
         // For rendering
         bool facingRight;
-        bool submerged;
         float rotation;          // For pike rotation during attacks
+        
+        // Constructor to initialize Entity base and mob-specific defaults
+        MobData() : Entity(), health(0), maxHealth(0), speed(0), 
+                    type(MobType::DUCK), state(MobState::IDLE),
+                    stateTimer(0), actionCooldown(0),
+                    circleAngle(0), chargeSpeed(0), attackPattern(0), phase(1),
+                    tailSweepAngle(0), ringRadius(0), ringThickness(0.5f),
+                    trolleyProgress(0), trolleysThrown(0), shotSpeed(0),
+                    facingRight(true), rotation(0) {}
     };
     
     const std::vector<MobData>& getMobs() const { return mobs; }
@@ -136,7 +141,6 @@ private:
     void updateNannyBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager);
     
     void applyMobRepulsion();
-    bool canMoveTo(MobData& mob, float x, float y, Room* room);
     
     std::vector<MobData> mobs;
     float deltaTime;  // Approximate frame time

@@ -9,14 +9,16 @@
 
 namespace CanalUx {
 
+class Room;  // Forward declaration
+
 class Projectile : public Entity {
 public:
     Projectile();
     Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool fromPlayer);
     ~Projectile();
 
-    // Entity interface
-    void update(float deltaTime) override;
+    // Update methods
+    void update(float deltaTime);
 
     // Update with room for collision
     void update(Room* currentRoom);
@@ -38,7 +40,7 @@ public:
     bool isDestroyed() const { return !active; }
 
 private:
-    void checkRoomCollision(Room* currentRoom);
+    // Note: World collision now handled by CollisionManager
 
     bool fromPlayer;  // true = player shot, false = enemy shot
     float damage;

@@ -123,8 +123,9 @@ void Game::handleInput() {
             if (engine->pad.getPressed().Start) {
                 setState(GameState::PAUSED);
             }
-            // Debug: Circle to reset game
+            // Debug: Circle to reset level
             if (engine->pad.getPressed().Cross) {
+                TYRA_LOG("CanalUx: Resetting level...");
                 startNewGame();
             }
             break;
@@ -170,10 +171,10 @@ void Game::update() {
     // Update projectiles
     projectileManager.update(room);
     
-    // Update mobs
+    // Update mobs (AI sets velocity, CollisionManager resolves collisions)
     mobManager.update(room, player.get(), &projectileManager);
     
-    // Check collisions
+    // Check collisions (handles all entity vs world and entity vs entity)
     collisionManager.checkCollisions(player.get(), &mobManager, &projectileManager, room);
     
     // Check if room is cleared

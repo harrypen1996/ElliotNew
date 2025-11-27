@@ -20,8 +20,8 @@ public:
     explicit Player(Tyra::Pad* pad);
     ~Player();
 
-    // Entity interface
-    void update(float deltaTime) override;
+    // Main update - called every frame
+    void update(float deltaTime);
 
     // Player-specific update with dependencies
     void update(Room* currentRoom, ProjectileManager* projectileManager);
@@ -55,7 +55,7 @@ private:
     void handleSubmergeInput();
     void updateSubmergeState(float deltaTime);
     void updateInvincibility(float deltaTime);
-    void checkRoomCollision(Room* currentRoom);
+    // Note: World collision now handled by CollisionManager
 
     // Input
     Tyra::Pad* pad;

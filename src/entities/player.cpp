@@ -51,11 +51,10 @@ void Player::update(Room* currentRoom, ProjectileManager* projectileManager) {
     // Clamp velocity
     clampVelocity();
 
-    // Apply velocity and check collisions
-    // (checkRoomCollision handles position updates)
+    // Apply velocity - collision manager will resolve world collisions
     position.x += velocity.x;
     position.y += velocity.y;
-    checkRoomCollision(currentRoom);
+    // Note: World collision resolution handled by CollisionManager::resolvePlayerWorldCollision()
 }
 
 void Player::update(Room* currentRoom) {
@@ -72,10 +71,10 @@ void Player::update(Room* currentRoom) {
     applyDrag();
     clampVelocity();
 
-    // Apply velocity and check collisions
+    // Apply velocity - collision manager will resolve world collisions
     position.x += velocity.x;
     position.y += velocity.y;
-    checkRoomCollision(currentRoom);
+    // Note: World collision resolution handled by CollisionManager::resolvePlayerWorldCollision()
 }
 
 void Player::handleMovementInput() {
@@ -209,171 +208,7 @@ bool Player::isInvincible() const {
     return invincibilityTimeRemaining > 0.0f;
 }
 
-void Player::checkRoomCollision(Room* currentRoom) {
-    if (!currentRoom) return;
-
-    float sizeInTilesX = size.x / Constants::TILE_SIZE;
-    float sizeInTilesY = size.y / Constants::TILE_SIZE;
-
-    // We need to check collision separately for X and Y movement
-    // First, undo the position change
-    position.x -= velocity.x;
-    position.y -= velocity.y;
-
-    // Store the original position
-    float origX = position.x;
-    float origY = position.y;
-
-    // --- Check X movement first ---
-    position.x += velocity.x;
-    
-    bool collidedX = false;
-    
-    if (velocity.x < 0) {
-        // Moving left - check left edge
-        int checkX = static_cast<int>(position.x);
-        int checkY1 = static_cast<int>(origY);
-        int checkY2 = static_cast<int>(origY + sizeInTilesY * 0.9f);
-        
-        if (currentRoom->getLandTile(checkX, checkY1) != 0 ||
-            currentRoom->getLandTile(checkX, checkY2) != 0) {
-            collidedX = true;
-        } else if (!submerged && 
-                   (currentRoom->getSceneryTile(checkX, checkY1) != 0 ||
-                    currentRoom->getSceneryTile(checkX, checkY2) != 0)) {
-            collidedX = true;
-        }
-        
-        // Check dynamic obstacles
-        if (!collidedX) {
-            for (const auto& obs : currentRoom->getObstacles()) {
-                if (obs.blocksPlayer) {
-                    // Check if new position overlaps obstacle
-                    if (position.x < obs.position.x + 1.0f &&
-                        position.x + sizeInTilesX > obs.position.x &&
-                        origY < obs.position.y + 1.0f &&
-                        origY + sizeInTilesY > obs.position.y) {
-                        collidedX = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (collidedX) {
-            position.x = static_cast<int>(position.x) + 1.0f;
-            velocity.x = 0;
-        }
-    } else if (velocity.x > 0) {
-        // Moving right - check right edge
-        int checkX = static_cast<int>(position.x + sizeInTilesX);
-        int checkY1 = static_cast<int>(origY);
-        int checkY2 = static_cast<int>(origY + sizeInTilesY * 0.9f);
-        
-        if (currentRoom->getLandTile(checkX, checkY1) != 0 ||
-            currentRoom->getLandTile(checkX, checkY2) != 0) {
-            collidedX = true;
-        } else if (!submerged && 
-                   (currentRoom->getSceneryTile(checkX, checkY1) != 0 ||
-                    currentRoom->getSceneryTile(checkX, checkY2) != 0)) {
-            collidedX = true;
-        }
-        
-        // Check dynamic obstacles
-        if (!collidedX) {
-            for (const auto& obs : currentRoom->getObstacles()) {
-                if (obs.blocksPlayer) {
-                    if (position.x + sizeInTilesX > obs.position.x &&
-                        position.x < obs.position.x + 1.0f &&
-                        origY < obs.position.y + 1.0f &&
-                        origY + sizeInTilesY > obs.position.y) {
-                        collidedX = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (collidedX) {
-            position.x = static_cast<int>(position.x + sizeInTilesX) - sizeInTilesX;
-            velocity.x = 0;
-        }
-    }
-
-    // --- Now check Y movement with the resolved X position ---
-    position.y += velocity.y;
-    
-    bool collidedY = false;
-    
-    if (velocity.y < 0) {
-        // Moving up - check top edge
-        int checkY = static_cast<int>(position.y);
-        int checkX1 = static_cast<int>(position.x);
-        int checkX2 = static_cast<int>(position.x + sizeInTilesX * 0.9f);
-        
-        if (currentRoom->getLandTile(checkX1, checkY) != 0 ||
-            currentRoom->getLandTile(checkX2, checkY) != 0) {
-            collidedY = true;
-        } else if (!submerged && 
-                   (currentRoom->getSceneryTile(checkX1, checkY) != 0 ||
-                    currentRoom->getSceneryTile(checkX2, checkY) != 0)) {
-            collidedY = true;
-        }
-        
-        // Check dynamic obstacles
-        if (!collidedY) {
-            for (const auto& obs : currentRoom->getObstacles()) {
-                if (obs.blocksPlayer) {
-                    if (position.x < obs.position.x + 1.0f &&
-                        position.x + sizeInTilesX > obs.position.x &&
-                        position.y < obs.position.y + 1.0f &&
-                        position.y + sizeInTilesY > obs.position.y) {
-                        collidedY = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (collidedY) {
-            position.y = static_cast<int>(position.y) + 1.0f;
-            velocity.y = 0;
-        }
-    } else if (velocity.y > 0) {
-        // Moving down - check bottom edge
-        int checkY = static_cast<int>(position.y + sizeInTilesY);
-        int checkX1 = static_cast<int>(position.x);
-        int checkX2 = static_cast<int>(position.x + sizeInTilesX * 0.9f);
-        
-        if (currentRoom->getLandTile(checkX1, checkY) != 0 ||
-            currentRoom->getLandTile(checkX2, checkY) != 0) {
-            collidedY = true;
-        } else if (!submerged && 
-                   (currentRoom->getSceneryTile(checkX1, checkY) != 0 ||
-                    currentRoom->getSceneryTile(checkX2, checkY) != 0)) {
-            collidedY = true;
-        }
-        
-        // Check dynamic obstacles
-        if (!collidedY) {
-            for (const auto& obs : currentRoom->getObstacles()) {
-                if (obs.blocksPlayer) {
-                    if (position.x < obs.position.x + 1.0f &&
-                        position.x + sizeInTilesX > obs.position.x &&
-                        position.y + sizeInTilesY > obs.position.y &&
-                        position.y < obs.position.y + 1.0f) {
-                        collidedY = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (collidedY) {
-            position.y = static_cast<int>(position.y + sizeInTilesY) - sizeInTilesY;
-            velocity.y = 0;
-        }
-    }
-}
+// Note: World collision is now handled by CollisionManager::resolvePlayerWorldCollision()
+// The old checkRoomCollision method has been removed.
 
 }  // namespace CanalUx

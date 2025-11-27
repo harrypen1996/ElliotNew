@@ -553,7 +553,7 @@ void EntityRenderer::renderRoomObstacles(Tyra::Renderer2D* renderer,
             sprite.size = Tyra::Vec2(64.0f, 64.0f);
             sprite.offset = Tyra::Vec2(0.0f, 192.0f);  // Row 3 in mobs sheet
             sprite.position = screenPos;
-            sprite.scale = 1.0f;
+            sprite.scale = 0.5f; // tile size
             
             renderer->render(sprite);
         }

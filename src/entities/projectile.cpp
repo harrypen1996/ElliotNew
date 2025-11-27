@@ -97,36 +97,7 @@ void Projectile::update(Room* currentRoom) {
     position.x += velocity.x;
     position.y += velocity.y;
 
-    // Check collision with walls
-    checkRoomCollision(currentRoom);
-}
-
-void Projectile::checkRoomCollision(Room* currentRoom) {
-    if (!currentRoom || !active) return;
-
-    float sizeInTiles = size.x / Constants::TILE_SIZE;
-
-    // Check if projectile hit a solid tile
-    int tileX = static_cast<int>(position.x);
-    int tileY = static_cast<int>(position.y);
-
-    // Check land tiles (walls)
-    if (currentRoom->getLandTile(tileX, tileY) != 0 ||
-        currentRoom->getLandTile(static_cast<int>(position.x + sizeInTiles * 0.9f), tileY) != 0 ||
-        currentRoom->getLandTile(tileX, static_cast<int>(position.y + sizeInTiles * 0.9f)) != 0) {
-        destroy();
-        return;
-    }
-
-    // Check scenery tiles (obstacles like doors) - projectiles collide with these
-    if (currentRoom->getSceneryTile(tileX, tileY) != 0 ||
-        currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTiles * 0.9f), tileY) != 0 ||
-        currentRoom->getSceneryTile(tileX, static_cast<int>(position.y + sizeInTiles * 0.9f)) != 0) {
-        destroy();
-        return;
-    }
-    
-    // Note: Room obstacles (trolleys etc) checked separately - some may allow projectiles through
+    // Note: World collision now handled by CollisionManager::checkProjectileWorldCollision()
 }
 
 }  // namespace CanalUx
