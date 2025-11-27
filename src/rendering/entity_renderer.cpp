@@ -257,6 +257,25 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
     float wiggleY = 0.0f;
     
     switch (pike.state) {
+        case MobState::PIKE_CIRCLING:
+        case MobState::PIKE_CHARGING: {
+            // MOVEMENT STATES - Show as submerged ripple
+            Tyra::Sprite subSprite;
+            subSprite.id = submergedSprite.id;
+            subSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+            subSprite.size = Tyra::Vec2(64.0f, 64.0f);
+            subSprite.position = screenPos;
+            // Movement while submerged
+            subSprite.position.x += std::sin(pike.stateTimer * 0.1f) * 2.0f;
+            subSprite.position.y += std::cos(pike.stateTimer * 0.15f) * 1.5f;
+            // Charging is faster movement = bigger ripple
+            float rippleScale = (pike.state == MobState::PIKE_CHARGING) ? 1.8f : 1.4f;
+            subSprite.scale = rippleScale;
+            subSprite.color = Tyra::Color(80, 130, 180, 140);  // Blue tint
+            renderer->render(subSprite);
+            return;  // Don't render pike body
+        }
+        
         case MobState::PIKE_EMERGING:
             // Head pointing UP (rotated +90), from row 1 left side
             offsetX = 0.0f;
@@ -265,7 +284,11 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
             spriteHeight = 128.0f;
             scale = 0.75f;
             // Wiggle side to side while emerging
-            wiggleX = std::sin(pike.stateTimer * 0.3f) * 3.0f;
+            wiggleX = std::sin(pike.stateTimer * 0.3f) * 4.0f;
+            // Rise up effect
+            if (pike.stateTimer < 10) {
+                sprite.position.y += 20.0f - pike.stateTimer * 2.0f;  // Rising up
+            }
             break;
             
         case MobState::PIKE_TAIL_SWEEP:
@@ -275,75 +298,91 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
             spriteWidth = 128.0f;
             spriteHeight = 128.0f;
             scale = 0.75f;
-            // Wiggle back and forth during sweep
-            wiggleX = std::sin(pike.stateTimer * 0.5f) * 5.0f;
+            // Wiggle back and forth during sweep - more aggressive
+            wiggleX = std::sin(pike.stateTimer * 0.6f) * 8.0f;
             break;
             
         case MobState::PIKE_SUBMERGED:
-            // When submerged, show ripple effect (use submerged sprite)
+            // Legacy state - show as ripple
             {
                 Tyra::Sprite subSprite;
                 subSprite.id = submergedSprite.id;
                 subSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
                 subSprite.size = Tyra::Vec2(64.0f, 64.0f);
                 subSprite.position = screenPos;
-                // Subtle movement while submerged
                 subSprite.position.x += std::sin(pike.stateTimer * 0.1f) * 2.0f;
                 subSprite.position.y += std::cos(pike.stateTimer * 0.15f) * 1.5f;
                 subSprite.scale = 1.5f;
-                subSprite.color = Tyra::Color(100, 150, 200, 150);  // Blue tint
+                subSprite.color = Tyra::Color(100, 150, 200, 150);
                 renderer->render(subSprite);
             }
-            return;  // Don't render pike sprite when fully submerged
+            return;
             
-        case MobState::PIKE_LEAP:
-            // Show shadow on the water where pike will land
-            {
-                Tyra::Sprite shadow;
-                shadow.id = shadowSprite.id;
-                shadow.mode = Tyra::SpriteMode::MODE_STRETCH;
-                shadow.size = Tyra::Vec2(128.0f, 64.0f);
-                shadow.position = screenPos;
-                shadow.position.y += 40.0f;  // Shadow below pike
-                // Shadow grows as pike rises, shrinks as it falls
-                float leapProgress = pike.stateTimer / 60.0f;  // 0 to 1 over 60 frames
-                float shadowScale = 0.5f + 0.3f * std::sin(leapProgress * 3.14159f);
-                shadow.scale = shadowScale;
-                shadow.color = Tyra::Color(50, 50, 50, 120);  // Dark, semi-transparent
-                renderer->render(shadow);
-            }
+        case MobState::PIKE_LEAP: {
+            // Full pike sprite is 256x128, rendered at scale 0.6 = ~154x77 on screen
+            // Shadow needs to be centered beneath the pike
+            
+            float pikeScale = 0.6f;
+            float pikeWidthOnScreen = 256.0f * pikeScale;  // ~154 pixels
+            float pikeHeightOnScreen = 128.0f * pikeScale; // ~77 pixels
+            
+            // Shadow grows as pike rises, shrinks as it falls
+            float leapProgress = pike.stateTimer / 55.0f;  // Matches crash timing
+            float shadowScale = 0.5f + 0.45f * std::sin(std::min(leapProgress, 1.0f) * 3.14159f);
+            
+            // Shadow base size - wider to match pike body
+            float shadowBaseWidth = 180.0f;
+            float shadowBaseHeight = 50.0f;
+            float shadowWidthOnScreen = shadowBaseWidth * shadowScale;
+            float shadowHeightOnScreen = shadowBaseHeight * shadowScale;
+            
+            // Center shadow under the pike
+            // Pike position is top-left, so center is at position + (width/2, height/2)
+            // Shadow should be centered at same X, but below on Y
+            Tyra::Sprite shadow;
+            shadow.id = shadowSprite.id;
+            shadow.mode = Tyra::SpriteMode::MODE_STRETCH;
+            shadow.size = Tyra::Vec2(shadowBaseWidth, shadowBaseHeight);
+            
+            // Center X: pike center minus half shadow width
+            shadow.position.x = screenPos.x + (pikeWidthOnScreen / 2.0f) - (shadowWidthOnScreen / 2.0f);
+            // Y: below pike (at water level)
+            shadow.position.y = screenPos.y + pikeHeightOnScreen + 10.0f;
+            
+            shadow.scale = shadowScale;
+            // More transparent - blend with water (alpha around 60-90)
+            int shadowAlpha = 50 + static_cast<int>(40 * shadowScale);
+            shadow.color = Tyra::Color(30, 40, 50, shadowAlpha);
+            renderer->render(shadow);
+            
             // Full pike in the air
             offsetY = 0.0f;
             spriteWidth = 256.0f;
             spriteHeight = 128.0f;
+            
             // Arc motion: rise then fall
-            {
-                float leapProgress = pike.stateTimer / 60.0f;
-                float arcHeight = std::sin(leapProgress * 3.14159f) * 40.0f;
-                sprite.position.y -= arcHeight;
+            float arcHeight = 0.0f;
+            if (pike.stateTimer < 25) {
+                // Rising
+                arcHeight = (pike.stateTimer / 25.0f) * 50.0f;
+            } else if (pike.stateTimer < 55) {
+                // In air then falling
+                float airProgress = (pike.stateTimer - 25) / 30.0f;
+                arcHeight = 50.0f * (1.0f - airProgress * airProgress);
             }
-            scale = 0.6f;
-            // Slight wiggle in the air
+            sprite.position.y -= arcHeight;
+            
+            scale = pikeScale;
             wiggleX = std::sin(pike.stateTimer * 0.4f) * 2.0f;
             break;
+        }
             
-        case MobState::PIKE_CHARGING:
-            // Full pike, slightly larger and wiggling aggressively
-            offsetY = 0.0f;
-            spriteWidth = 256.0f;
-            spriteHeight = 128.0f;
-            scale = 0.55f;
-            wiggleY = std::sin(pike.stateTimer * 0.8f) * 2.0f;
-            break;
-            
-        case MobState::PIKE_CIRCLING:
         default:
-            // Full pike, normal size with gentle swimming motion
+            // Fallback - show full pike
             offsetY = 0.0f;
             spriteWidth = 256.0f;
             spriteHeight = 128.0f;
             scale = 0.5f;
-            // Gentle up/down swimming motion
             wiggleY = std::sin(pike.stateTimer * 0.15f) * 1.5f;
             break;
     }

@@ -100,7 +100,7 @@ namespace Cheats {
     constexpr bool SHOW_DEBUG_INFO = false;
     
     // Fast player speed multiplier
-    constexpr float SPEED_MULTIPLIER = 1.0f;  // Set to 2.0f for double speed
+    constexpr float SPEED_MULTIPLIER = 1.5f;  // Set to 2.0f for double speed
 }
 
 }  // namespace Constants

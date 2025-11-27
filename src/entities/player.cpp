@@ -80,7 +80,7 @@ void Player::update(Room* currentRoom) {
 
 void Player::handleMovementInput() {
     const auto& leftJoy = pad->getLeftJoyPad();
-    float speed = stats.getSpeed();
+    float speed = stats.getSpeed() * Constants::Cheats::SPEED_MULTIPLIER;
 
     // Vertical movement
     if (leftJoy.v <= 100) {
@@ -140,9 +140,9 @@ void Player::handleShootingInput(ProjectileManager* projectileManager) {
 }
 
 void Player::handleSubmergeInput() {
-    if (pad->getPressed().Cross) {
+    if (pad->getPressed().Circle) {
         trySubmerge();
-    } else if (submerged && !pad->getPressed().Cross) {
+    } else if (submerged && !pad->getPressed().Circle) {
         // Released button - start surfacing
         // For now, instant surface. Could add a delay.
         submerged = false;
