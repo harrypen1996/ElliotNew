@@ -131,7 +131,7 @@ void Room::clearObstacles() {
 
 bool Room::hasObstacleAt(float x, float y) const {
     for (const auto& obs : obstacles) {
-        if (obs.blocksMovement) {
+        if (obs.blocksPlayer) {
             // Check if position is within obstacle bounds (assume 1 tile size)
             float dx = x - obs.position.x;
             float dy = y - obs.position.y;

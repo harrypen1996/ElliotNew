@@ -244,8 +244,24 @@ void Player::checkRoomCollision(Room* currentRoom) {
             collidedX = true;
         }
         
+        // Check dynamic obstacles
+        if (!collidedX) {
+            for (const auto& obs : currentRoom->getObstacles()) {
+                if (obs.blocksPlayer) {
+                    // Check if new position overlaps obstacle
+                    if (position.x < obs.position.x + 1.0f &&
+                        position.x + sizeInTilesX > obs.position.x &&
+                        origY < obs.position.y + 1.0f &&
+                        origY + sizeInTilesY > obs.position.y) {
+                        collidedX = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (collidedX) {
-            position.x = checkX + 1.0f;
+            position.x = static_cast<int>(position.x) + 1.0f;
             velocity.x = 0;
         }
     } else if (velocity.x > 0) {
@@ -263,8 +279,23 @@ void Player::checkRoomCollision(Room* currentRoom) {
             collidedX = true;
         }
         
+        // Check dynamic obstacles
+        if (!collidedX) {
+            for (const auto& obs : currentRoom->getObstacles()) {
+                if (obs.blocksPlayer) {
+                    if (position.x + sizeInTilesX > obs.position.x &&
+                        position.x < obs.position.x + 1.0f &&
+                        origY < obs.position.y + 1.0f &&
+                        origY + sizeInTilesY > obs.position.y) {
+                        collidedX = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (collidedX) {
-            position.x = checkX - sizeInTilesX;
+            position.x = static_cast<int>(position.x + sizeInTilesX) - sizeInTilesX;
             velocity.x = 0;
         }
     }
@@ -289,8 +320,23 @@ void Player::checkRoomCollision(Room* currentRoom) {
             collidedY = true;
         }
         
+        // Check dynamic obstacles
+        if (!collidedY) {
+            for (const auto& obs : currentRoom->getObstacles()) {
+                if (obs.blocksPlayer) {
+                    if (position.x < obs.position.x + 1.0f &&
+                        position.x + sizeInTilesX > obs.position.x &&
+                        position.y < obs.position.y + 1.0f &&
+                        position.y + sizeInTilesY > obs.position.y) {
+                        collidedY = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (collidedY) {
-            position.y = checkY + 1.0f;
+            position.y = static_cast<int>(position.y) + 1.0f;
             velocity.y = 0;
         }
     } else if (velocity.y > 0) {
@@ -308,8 +354,23 @@ void Player::checkRoomCollision(Room* currentRoom) {
             collidedY = true;
         }
         
+        // Check dynamic obstacles
+        if (!collidedY) {
+            for (const auto& obs : currentRoom->getObstacles()) {
+                if (obs.blocksPlayer) {
+                    if (position.x < obs.position.x + 1.0f &&
+                        position.x + sizeInTilesX > obs.position.x &&
+                        position.y + sizeInTilesY > obs.position.y &&
+                        position.y < obs.position.y + 1.0f) {
+                        collidedY = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (collidedY) {
-            position.y = checkY - sizeInTilesY;
+            position.y = static_cast<int>(position.y + sizeInTilesY) - sizeInTilesY;
             velocity.y = 0;
         }
     }

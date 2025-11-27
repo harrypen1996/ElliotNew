@@ -809,12 +809,12 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
                     mob.slamPosition.x = mob.position.x + 2.0f;
                     mob.slamPosition.y = mob.position.y + 4.0f;
                 } else if (attackRoll < slamChance + shotChance) {
-                    // Warning shot - aim at player
-                    mob.state = MobState::LOCKKEEPER_SHOT_AIM;
+                    // Warning shot - aim at player, fires accelerating projectiles
+                    mob.state = MobState::LOCKKEEPER_SHOT;
                     mob.stateTimer = 0;
                     // Calculate direction to player
-                    float aimDx = player->position.x - mob.position.x;
-                    float aimDy = player->position.y - mob.position.y;
+                    float aimDx = player->position.x - (mob.position.x + 2.0f);
+                    float aimDy = player->position.y - (mob.position.y + 4.0f);
                     float aimLen = std::sqrt(aimDx * aimDx + aimDy * aimDy);
                     if (aimLen > 0.0f) {
                         mob.shotDirection.x = aimDx / aimLen;
@@ -826,7 +826,6 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
                     // Shot starts at bottom center of boss
                     mob.shotPosition.x = mob.position.x + 2.0f;
                     mob.shotPosition.y = mob.position.y + 4.0f;
-                    mob.shotSpeed = 0.02f;  // Start slow
                 } else if (attackRoll < slamChance + shotChance + trolleyChance && mob.trolleysThrown < 6) {
                     mob.state = MobState::LOCKKEEPER_THROW_WINDUP;
                     mob.stateTimer = 0;
@@ -912,8 +911,10 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
                 RoomObstacle trolley;
                 trolley.position = mob.trolleyTarget;
                 trolley.type = 0;  // Trolley type
-                trolley.blocksMovement = true;
-                trolley.blocksBullets = true;
+                trolley.blocksPlayer = true;      // Player can't walk through
+                trolley.blocksEnemies = false;    // Enemies can walk through
+                trolley.blocksPlayerShots = false;// Player shots pass through
+                trolley.blocksEnemyShots = false; // Enemy shots pass through
                 room->addObstacle(trolley);
                 
                 mob.trolleysThrown++;
@@ -940,44 +941,29 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
             break;
         }
         
-        case MobState::LOCKKEEPER_SHOT_AIM: {
-            // Aiming at player - telegraph with visible projectile
-            // Spawn slow-moving projectiles in aim direction as warning
-            if (static_cast<int>(mob.stateTimer) % 8 == 0) {
-                // Spawn a warning projectile (moves slowly in aim direction)
+        case MobState::LOCKKEEPER_SHOT: {
+            // Fire accelerating projectiles at player
+            // Projectiles start slow and speed up, giving player time to react
+            int spawnRate = 6 - mob.phase;  // Spawn every 5/4/3 frames based on phase
+            if (spawnRate < 3) spawnRate = 3;
+            
+            if (static_cast<int>(mob.stateTimer) % spawnRate == 0) {
+                // Spawn accelerating projectile
                 Tyra::Vec2 projPos = mob.shotPosition;
                 Tyra::Vec2 projVel;
-                projVel.x = mob.shotDirection.x * 0.03f;
-                projVel.y = mob.shotDirection.y * 0.03f;
-                projectileManager->spawnEnemyProjectile(projPos, projVel, 999.0f);
-            }
-            
-            // After aiming time, fire the real shot
-            int aimTime = 40 - (mob.phase - 1) * 8;  // 40, 32, 24 frames
-            if (mob.stateTimer >= aimTime) {
-                mob.state = MobState::LOCKKEEPER_SHOT_FIRE;
-                mob.stateTimer = 0;
-                mob.shotSpeed = 0.05f;  // Initial speed
-            }
-            break;
-        }
-        
-        case MobState::LOCKKEEPER_SHOT_FIRE: {
-            // Fire rapid accelerating projectiles
-            mob.shotSpeed += 0.008f;  // Accelerate
-            if (mob.shotSpeed > 0.35f) mob.shotSpeed = 0.35f;  // Cap speed
-            
-            // Spawn projectiles rapidly
-            if (static_cast<int>(mob.stateTimer) % 2 == 0) {
-                Tyra::Vec2 projPos = mob.shotPosition;
-                Tyra::Vec2 projVel;
-                projVel.x = mob.shotDirection.x * mob.shotSpeed;
-                projVel.y = mob.shotDirection.y * mob.shotSpeed;
-                projectileManager->spawnEnemyProjectile(projPos, projVel, 999.0f);
+                float initialSpeed = 0.02f;  // Start very slow
+                projVel.x = mob.shotDirection.x * initialSpeed;
+                projVel.y = mob.shotDirection.y * initialSpeed;
+                
+                // Acceleration and max speed increase with phase
+                float accel = 0.004f + mob.phase * 0.001f;  // 0.005, 0.006, 0.007
+                float maxSpd = 0.25f + mob.phase * 0.05f;   // 0.30, 0.35, 0.40
+                
+                projectileManager->spawnAcceleratingProjectile(projPos, projVel, 999.0f, accel, maxSpd, false);
             }
             
             // Fire for a duration then stop
-            int fireTime = 30 + mob.phase * 10;  // 40, 50, 60 frames
+            int fireTime = 50 + mob.phase * 15;  // 65, 80, 95 frames
             if (mob.stateTimer >= fireTime) {
                 mob.state = MobState::LOCKKEEPER_STUNNED;
                 mob.stateTimer = 0;

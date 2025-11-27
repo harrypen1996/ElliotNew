@@ -54,8 +54,7 @@ enum class MobState {
     LOCKKEEPER_THROW_WINDUP,// Winding up to throw trolley
     LOCKKEEPER_THROWING,    // Throwing trolley
     LOCKKEEPER_STUNNED,     // Brief recovery after attack
-    LOCKKEEPER_SHOT_AIM,    // Aiming warning shot at player
-    LOCKKEEPER_SHOT_FIRE    // Firing the shot
+    LOCKKEEPER_SHOT         // Firing accelerating warning shots
 };
 
 class MobManager {

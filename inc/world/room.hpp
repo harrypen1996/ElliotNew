@@ -27,10 +27,12 @@ enum class RoomType {
  * Obstacle placed during gameplay (e.g., trolley from Lock Keeper)
  */
 struct RoomObstacle {
-    Tyra::Vec2 position;  // Tile position
-    int type;             // Obstacle type (0 = trolley, etc.)
-    bool blocksMovement;
-    bool blocksBullets;
+    Tyra::Vec2 position;      // Tile position
+    int type;                 // Obstacle type (0 = trolley, etc.)
+    bool blocksPlayer;        // Player cannot walk through
+    bool blocksEnemies;       // Enemies cannot walk through
+    bool blocksPlayerShots;   // Player projectiles collide
+    bool blocksEnemyShots;    // Enemy projectiles collide
 };
 
 /**

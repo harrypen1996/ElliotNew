@@ -27,6 +27,11 @@ public:
     float getDistanceTraveled() const { return distanceTraveled; }
     float getMaxRange() const { return maxRange; }
     void setMaxRange(float range) { maxRange = range; }
+    
+    // Acceleration - projectile speeds up over time
+    void setAcceleration(float accel) { acceleration = accel; }
+    float getAcceleration() const { return acceleration; }
+    void setMaxSpeed(float speed) { maxSpeed = speed; }
 
     // Destruction
     void destroy() { active = false; }
@@ -39,6 +44,8 @@ private:
     float damage;
     float distanceTraveled;
     float maxRange;
+    float acceleration;  // Speed increase per frame (0 = no acceleration)
+    float maxSpeed;      // Maximum speed cap
 };
 
 }  // namespace CanalUx

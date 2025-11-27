@@ -13,7 +13,9 @@ Projectile::Projectile()
       fromPlayer(true),
       damage(1.0f),
       distanceTraveled(0.0f),
-      maxRange(10.0f) {
+      maxRange(10.0f),
+      acceleration(0.0f),
+      maxSpeed(1.0f) {
 }
 
 Projectile::Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool playerOwned)
@@ -21,7 +23,9 @@ Projectile::Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool playerOwn
       fromPlayer(playerOwned),
       damage(dmg),
       distanceTraveled(0.0f),
-      maxRange(10.0f) {
+      maxRange(10.0f),
+      acceleration(0.0f),
+      maxSpeed(1.0f) {
     velocity = vel;
 }
 
@@ -30,6 +34,18 @@ Projectile::~Projectile() {
 
 void Projectile::update(float deltaTime) {
     if (!active) return;
+
+    // Apply acceleration if set
+    if (acceleration > 0.0f) {
+        float currentSpeed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+        if (currentSpeed > 0.0f && currentSpeed < maxSpeed) {
+            float newSpeed = currentSpeed + acceleration;
+            if (newSpeed > maxSpeed) newSpeed = maxSpeed;
+            float scale = newSpeed / currentSpeed;
+            velocity.x *= scale;
+            velocity.y *= scale;
+        }
+    }
 
     // Track distance traveled
     float dx = velocity.x;
@@ -49,6 +65,18 @@ void Projectile::update(float deltaTime) {
 
 void Projectile::update(Room* currentRoom) {
     if (!active) return;
+
+    // Apply acceleration if set
+    if (acceleration > 0.0f) {
+        float currentSpeed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+        if (currentSpeed > 0.0f && currentSpeed < maxSpeed) {
+            float newSpeed = currentSpeed + acceleration;
+            if (newSpeed > maxSpeed) newSpeed = maxSpeed;
+            float scale = newSpeed / currentSpeed;
+            velocity.x *= scale;
+            velocity.y *= scale;
+        }
+    }
 
     // Track distance traveled
     float dx = velocity.x;
@@ -90,13 +118,15 @@ void Projectile::checkRoomCollision(Room* currentRoom) {
         return;
     }
 
-    // Check scenery tiles (obstacles) - projectiles always collide with these
+    // Check scenery tiles (obstacles like doors) - projectiles collide with these
     if (currentRoom->getSceneryTile(tileX, tileY) != 0 ||
         currentRoom->getSceneryTile(static_cast<int>(position.x + sizeInTiles * 0.9f), tileY) != 0 ||
         currentRoom->getSceneryTile(tileX, static_cast<int>(position.y + sizeInTiles * 0.9f)) != 0) {
         destroy();
         return;
     }
+    
+    // Note: Room obstacles (trolleys etc) checked separately - some may allow projectiles through
 }
 
 }  // namespace CanalUx
