@@ -132,10 +132,10 @@ void Room::clearObstacles() {
 bool Room::hasObstacleAt(float x, float y) const {
     for (const auto& obs : obstacles) {
         if (obs.blocksPlayer) {
-            // Check if position is within obstacle bounds (assume 1 tile size)
+            // Check if position is within obstacle bounds
             float dx = x - obs.position.x;
             float dy = y - obs.position.y;
-            if (dx >= 0 && dx < 1.0f && dy >= 0 && dy < 1.0f) {
+            if (dx >= 0 && dx < obs.size.x && dy >= 0 && dy < obs.size.y) {
                 return true;
             }
         }
@@ -162,6 +162,55 @@ void Room::shrinkArena(float amount) {
     if (arenaMaxY - arenaMinY < minSize) {
         arenaMinY = centerY - minSize / 2.0f;
         arenaMaxY = centerY + minSize / 2.0f;
+    }
+}
+
+void Room::shrinkArenaHorizontal(float amount) {
+    float oldMinX = arenaMinX;
+    float oldMaxX = arenaMaxX;
+    
+    // Shrink left and right only
+    arenaMinX += amount;
+    arenaMaxX -= amount;
+    
+    // Don't shrink below minimum width
+    float minWidth = static_cast<float>(Constants::LOCKKEEPER_ROOM_MIN_WIDTH);
+    float centerX = width / 2.0f;
+    
+    if (arenaMaxX - arenaMinX < minWidth) {
+        arenaMinX = centerX - minWidth / 2.0f;
+        arenaMaxX = centerX + minWidth / 2.0f;
+    }
+    
+    // Add visual barrier obstacles at the new edges
+    // Left wall - add obstacles from old edge to new edge
+    for (float x = oldMinX; x < arenaMinX; x += 1.0f) {
+        for (float y = arenaMinY; y < arenaMaxY; y += 1.0f) {
+            RoomObstacle barrier;
+            barrier.position = Tyra::Vec2(x, y);
+            barrier.size = Tyra::Vec2(1.0f, 1.0f);
+            barrier.type = 1;  // Barrier type (different from trolley)
+            barrier.blocksPlayer = true;
+            barrier.blocksEnemies = false;
+            barrier.blocksPlayerShots = false;
+            barrier.blocksEnemyShots = false;
+            obstacles.push_back(barrier);
+        }
+    }
+    
+    // Right wall - add obstacles from new edge to old edge
+    for (float x = arenaMaxX; x < oldMaxX; x += 1.0f) {
+        for (float y = arenaMinY; y < arenaMaxY; y += 1.0f) {
+            RoomObstacle barrier;
+            barrier.position = Tyra::Vec2(x, y);
+            barrier.size = Tyra::Vec2(1.0f, 1.0f);
+            barrier.type = 1;  // Barrier type
+            barrier.blocksPlayer = true;
+            barrier.blocksEnemies = false;
+            barrier.blocksPlayerShots = false;
+            barrier.blocksEnemyShots = false;
+            obstacles.push_back(barrier);
+        }
     }
 }
 

@@ -740,6 +740,7 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
     float distX = std::abs(dx);
     
     // Update phase based on health
+    int oldPhase = mob.phase;
     float healthPercent = mob.health / mob.maxHealth;
     if (healthPercent <= 0.3f) {
         mob.phase = 3;
@@ -747,6 +748,23 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
         mob.phase = 2;
     } else {
         mob.phase = 1;
+    }
+    
+    // Big arena shrink on phase transition
+    if (mob.phase > oldPhase) {
+        if (mob.phase == 2) {
+            // Phase 2: Shrink horizontally by 3 tiles on each side
+            float shrinkAmount = 3.0f;
+            room->shrinkArenaHorizontal(shrinkAmount);
+        } else if (mob.phase == 3) {
+            // Phase 3: Shrink to minimum fighting space
+            float currentWidth = room->getArenaMaxX() - room->getArenaMinX();
+            float targetWidth = static_cast<float>(Constants::LOCKKEEPER_ROOM_MIN_WIDTH);
+            if (currentWidth > targetWidth) {
+                float shrinkAmount = (currentWidth - targetWidth) / 2.0f;
+                room->shrinkArenaHorizontal(shrinkAmount);
+            }
+        }
     }
     
     // Facing direction
@@ -898,11 +916,6 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
                 
                 mob.trolleysThrown++;
                 
-                // Shrink arena slightly each trolley (phase 2+)
-                if (mob.phase >= 2) {
-                    room->shrinkArena(0.25f);
-                }
-                
                 mob.state = MobState::LOCKKEEPER_STUNNED;
                 mob.stateTimer = 0;
             }
@@ -954,11 +967,6 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
             mob.state = MobState::LOCKKEEPER_WALKING;
             mob.stateTimer = 0;
             break;
-    }
-    
-    // Phase 3: Arena shrinks over time
-    if (mob.phase >= 3 && static_cast<int>(mob.stateTimer) % 300 == 0 && mob.stateTimer > 0) {  // Every ~5 seconds
-        room->shrinkArena(0.1f);
     }
 }
 

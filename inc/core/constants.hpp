@@ -44,9 +44,19 @@ constexpr int LEVEL_GRID_HEIGHT = 8;
 constexpr int MIN_ROOMS_PER_LEVEL = 6;
 constexpr int MAX_ROOMS_PER_LEVEL = 12;
 
-// Boss room sizes (larger arena for boss fights)
-constexpr int BOSS_ROOM_WIDTH = 24;   // Wider arena
-constexpr int BOSS_ROOM_HEIGHT = 20;  // Taller arena
+// Boss room sizes per level
+// Level 1 - Pike: Large open water arena for swimming
+constexpr int PIKE_ROOM_WIDTH = 24;
+constexpr int PIKE_ROOM_HEIGHT = 20;
+
+// Level 2 - Lock Keeper: Wide but short, shrinks horizontally
+constexpr int LOCKKEEPER_ROOM_WIDTH = 28;
+constexpr int LOCKKEEPER_ROOM_HEIGHT = 14;  // Minimum height, no vertical space
+constexpr int LOCKKEEPER_ROOM_MIN_WIDTH = 12;  // Shrinks to this in phase 3
+
+// Level 3 - Nanny: TBD
+constexpr int NANNY_ROOM_WIDTH = 20;
+constexpr int NANNY_ROOM_HEIGHT = 18;
 
 // Game progression
 constexpr int TOTAL_LEVELS = 3;  // 3 canal sections to escape
@@ -79,7 +89,7 @@ namespace Sprites {
 // ============================================
 namespace Cheats {
     // God mode - player can't take damage
-    constexpr bool GOD_MODE = false;
+    constexpr bool GOD_MODE = true;
     
     // Massive damage - one-shot everything
     constexpr bool ONE_HIT_KILLS = false;
@@ -91,7 +101,7 @@ namespace Cheats {
     constexpr bool ROOMS_PRE_CLEARED = false;
     
     // Skip straight to boss room
-    constexpr bool SKIP_TO_BOSS = true;
+    constexpr bool SKIP_TO_BOSS = false;
     
     // Infinite submerge (no cooldown/duration limit)
     constexpr bool INFINITE_SUBMERGE = false;

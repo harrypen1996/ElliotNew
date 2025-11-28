@@ -81,6 +81,7 @@ void CollisionManager::resolvePlayerWorldCollision(Player* player, Room* room) {
     float sizeInTilesX = player->size.x / Constants::TILE_SIZE;
     float sizeInTilesY = player->size.y / Constants::TILE_SIZE;
     bool isSubmerged = player->isSubmerged();
+    Tyra::Vec2 playerSize(sizeInTilesX, sizeInTilesY);
     
     // Undo position change to test collision properly
     float newX = player->position.x;
@@ -95,24 +96,48 @@ void CollisionManager::resolvePlayerWorldCollision(Player* player, Room* room) {
     bool collidedX = false;
     
     if (player->velocity.x < 0) {
-        // Moving left
+        // Moving left - check tiles
         int checkX = static_cast<int>(player->position.x);
         if (checkTileCollision(room, checkX, origY, isSubmerged) ||
-            checkTileCollision(room, checkX, origY + sizeInTilesY * 0.9f, isSubmerged) ||
-            checkObstacleCollisionForPlayer(room, player->position.x, origY, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, checkX, origY + sizeInTilesY * 0.9f, isSubmerged)) {
             collidedX = true;
             player->position.x = checkX + 1.0f;
             player->velocity.x = 0;
         }
+        
+        // Check obstacles separately
+        if (!collidedX) {
+            Tyra::Vec2 testPos(player->position.x, origY);
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksPlayer && checkAABB(testPos, playerSize, obs.position, obs.size)) {
+                    player->position.x = obs.position.x + obs.size.x;
+                    player->velocity.x = 0;
+                    collidedX = true;
+                    break;
+                }
+            }
+        }
     } else if (player->velocity.x > 0) {
-        // Moving right
+        // Moving right - check tiles
         int checkX = static_cast<int>(player->position.x + sizeInTilesX);
         if (checkTileCollision(room, checkX, origY, isSubmerged) ||
-            checkTileCollision(room, checkX, origY + sizeInTilesY * 0.9f, isSubmerged) ||
-            checkObstacleCollisionForPlayer(room, player->position.x, origY, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, checkX, origY + sizeInTilesY * 0.9f, isSubmerged)) {
             collidedX = true;
             player->position.x = checkX - sizeInTilesX;
             player->velocity.x = 0;
+        }
+        
+        // Check obstacles separately
+        if (!collidedX) {
+            Tyra::Vec2 testPos(player->position.x, origY);
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksPlayer && checkAABB(testPos, playerSize, obs.position, obs.size)) {
+                    player->position.x = obs.position.x - sizeInTilesX;
+                    player->velocity.x = 0;
+                    collidedX = true;
+                    break;
+                }
+            }
         }
     }
     
@@ -121,24 +146,46 @@ void CollisionManager::resolvePlayerWorldCollision(Player* player, Room* room) {
     bool collidedY = false;
     
     if (player->velocity.y < 0) {
-        // Moving up
+        // Moving up - check tiles
         int checkY = static_cast<int>(player->position.y);
         if (checkTileCollision(room, player->position.x, checkY, isSubmerged) ||
-            checkTileCollision(room, player->position.x + sizeInTilesX * 0.9f, checkY, isSubmerged) ||
-            checkObstacleCollisionForPlayer(room, player->position.x, player->position.y, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, player->position.x + sizeInTilesX * 0.9f, checkY, isSubmerged)) {
             collidedY = true;
             player->position.y = checkY + 1.0f;
             player->velocity.y = 0;
         }
+        
+        // Check obstacles separately
+        if (!collidedY) {
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksPlayer && checkAABB(player->position, playerSize, obs.position, obs.size)) {
+                    player->position.y = obs.position.y + obs.size.y;
+                    player->velocity.y = 0;
+                    collidedY = true;
+                    break;
+                }
+            }
+        }
     } else if (player->velocity.y > 0) {
-        // Moving down
+        // Moving down - check tiles
         int checkY = static_cast<int>(player->position.y + sizeInTilesY);
         if (checkTileCollision(room, player->position.x, checkY, isSubmerged) ||
-            checkTileCollision(room, player->position.x + sizeInTilesX * 0.9f, checkY, isSubmerged) ||
-            checkObstacleCollisionForPlayer(room, player->position.x, player->position.y, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, player->position.x + sizeInTilesX * 0.9f, checkY, isSubmerged)) {
             collidedY = true;
             player->position.y = checkY - sizeInTilesY;
             player->velocity.y = 0;
+        }
+        
+        // Check obstacles separately
+        if (!collidedY) {
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksPlayer && checkAABB(player->position, playerSize, obs.position, obs.size)) {
+                    player->position.y = obs.position.y - sizeInTilesY;
+                    player->velocity.y = 0;
+                    collidedY = true;
+                    break;
+                }
+            }
         }
     }
 }
@@ -148,46 +195,105 @@ void CollisionManager::resolveMobWorldCollision(MobManager::MobData& mob, Room* 
     
     float sizeInTilesX = mob.size.x / Constants::TILE_SIZE;
     float sizeInTilesY = mob.size.y / Constants::TILE_SIZE;
+    Tyra::Vec2 mobSize(sizeInTilesX, sizeInTilesY);
     
     // Store position before velocity was applied
     float oldX = mob.position.x - mob.velocity.x;
     float oldY = mob.position.y - mob.velocity.y;
     
     // --- Check X collision ---
+    bool collidedX = false;
+    
     if (mob.velocity.x < 0) {
+        // Moving left - check tiles
         int checkX = static_cast<int>(mob.position.x);
         if (checkTileCollision(room, checkX, oldY, mob.submerged) ||
-            checkTileCollision(room, checkX, oldY + sizeInTilesY * 0.9f, mob.submerged) ||
-            checkObstacleCollisionForEnemy(room, mob.position.x, oldY, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, checkX, oldY + sizeInTilesY * 0.9f, mob.submerged)) {
             mob.position.x = checkX + 1.0f;
             mob.velocity.x = 0;
+            collidedX = true;
+        }
+        
+        // Check obstacles separately
+        if (!collidedX) {
+            Tyra::Vec2 testPos(mob.position.x, oldY);
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksEnemies && checkAABB(testPos, mobSize, obs.position, obs.size)) {
+                    mob.position.x = obs.position.x + obs.size.x;
+                    mob.velocity.x = 0;
+                    collidedX = true;
+                    break;
+                }
+            }
         }
     } else if (mob.velocity.x > 0) {
+        // Moving right - check tiles
         int checkX = static_cast<int>(mob.position.x + sizeInTilesX);
         if (checkTileCollision(room, checkX, oldY, mob.submerged) ||
-            checkTileCollision(room, checkX, oldY + sizeInTilesY * 0.9f, mob.submerged) ||
-            checkObstacleCollisionForEnemy(room, mob.position.x, oldY, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, checkX, oldY + sizeInTilesY * 0.9f, mob.submerged)) {
             mob.position.x = checkX - sizeInTilesX;
             mob.velocity.x = 0;
+            collidedX = true;
+        }
+        
+        // Check obstacles separately
+        if (!collidedX) {
+            Tyra::Vec2 testPos(mob.position.x, oldY);
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksEnemies && checkAABB(testPos, mobSize, obs.position, obs.size)) {
+                    mob.position.x = obs.position.x - sizeInTilesX;
+                    mob.velocity.x = 0;
+                    collidedX = true;
+                    break;
+                }
+            }
         }
     }
     
     // --- Check Y collision ---
+    bool collidedY = false;
+    
     if (mob.velocity.y < 0) {
+        // Moving up - check tiles
         int checkY = static_cast<int>(mob.position.y);
         if (checkTileCollision(room, mob.position.x, checkY, mob.submerged) ||
-            checkTileCollision(room, mob.position.x + sizeInTilesX * 0.9f, checkY, mob.submerged) ||
-            checkObstacleCollisionForEnemy(room, mob.position.x, mob.position.y, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, mob.position.x + sizeInTilesX * 0.9f, checkY, mob.submerged)) {
             mob.position.y = checkY + 1.0f;
             mob.velocity.y = 0;
+            collidedY = true;
+        }
+        
+        // Check obstacles separately
+        if (!collidedY) {
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksEnemies && checkAABB(mob.position, mobSize, obs.position, obs.size)) {
+                    mob.position.y = obs.position.y + obs.size.y;
+                    mob.velocity.y = 0;
+                    collidedY = true;
+                    break;
+                }
+            }
         }
     } else if (mob.velocity.y > 0) {
+        // Moving down - check tiles
         int checkY = static_cast<int>(mob.position.y + sizeInTilesY);
         if (checkTileCollision(room, mob.position.x, checkY, mob.submerged) ||
-            checkTileCollision(room, mob.position.x + sizeInTilesX * 0.9f, checkY, mob.submerged) ||
-            checkObstacleCollisionForEnemy(room, mob.position.x, mob.position.y, sizeInTilesX, sizeInTilesY)) {
+            checkTileCollision(room, mob.position.x + sizeInTilesX * 0.9f, checkY, mob.submerged)) {
             mob.position.y = checkY - sizeInTilesY;
             mob.velocity.y = 0;
+            collidedY = true;
+        }
+        
+        // Check obstacles separately
+        if (!collidedY) {
+            for (const auto& obs : room->getObstacles()) {
+                if (obs.blocksEnemies && checkAABB(mob.position, mobSize, obs.position, obs.size)) {
+                    mob.position.y = obs.position.y - sizeInTilesY;
+                    mob.velocity.y = 0;
+                    collidedY = true;
+                    break;
+                }
+            }
         }
     }
 }
@@ -340,43 +446,35 @@ bool CollisionManager::checkTileCollision(Room* room, float x, float y, bool isS
 }
 
 bool CollisionManager::checkObstacleCollisionForPlayer(Room* room, float x, float y, float width, float height) {
+    Tyra::Vec2 pos(x, y);
+    Tyra::Vec2 size(width, height);
     for (const auto& obs : room->getObstacles()) {
-        if (obs.blocksPlayer) {
-            // AABB check
-            if (x < obs.position.x + 1.0f &&
-                x + width > obs.position.x &&
-                y < obs.position.y + 1.0f &&
-                y + height > obs.position.y) {
-                return true;
-            }
+        if (obs.blocksPlayer && checkAABB(pos, size, obs.position, obs.size)) {
+            return true;
         }
     }
     return false;
 }
 
 bool CollisionManager::checkObstacleCollisionForEnemy(Room* room, float x, float y, float width, float height) {
+    Tyra::Vec2 pos(x, y);
+    Tyra::Vec2 size(width, height);
     for (const auto& obs : room->getObstacles()) {
-        if (obs.blocksEnemies) {
-            if (x < obs.position.x + 1.0f &&
-                x + width > obs.position.x &&
-                y < obs.position.y + 1.0f &&
-                y + height > obs.position.y) {
-                return true;
-            }
+        if (obs.blocksEnemies && checkAABB(pos, size, obs.position, obs.size)) {
+            return true;
         }
     }
     return false;
 }
 
 bool CollisionManager::checkObstacleCollisionForProjectile(Room* room, float x, float y, bool isPlayerProjectile) {
+    // Point check - use tiny size for projectile center
+    Tyra::Vec2 pos(x, y);
+    Tyra::Vec2 size(0.1f, 0.1f);
     for (const auto& obs : room->getObstacles()) {
         bool blocks = isPlayerProjectile ? obs.blocksPlayerShots : obs.blocksEnemyShots;
-        if (blocks) {
-            // Point-in-box check for projectile
-            if (x >= obs.position.x && x < obs.position.x + 1.0f &&
-                y >= obs.position.y && y < obs.position.y + 1.0f) {
-                return true;
-            }
+        if (blocks && checkAABB(pos, size, obs.position, obs.size)) {
+            return true;
         }
     }
     return false;

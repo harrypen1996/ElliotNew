@@ -249,9 +249,25 @@ void Level::generateRoomTiles() {
                     height = Constants::ROOM_MIN_HEIGHT;
                     break;
                 case RoomType::BOSS:
-                    // Larger arena for boss fights
-                    width = Constants::BOSS_ROOM_WIDTH;
-                    height = Constants::BOSS_ROOM_HEIGHT;
+                    // Boss room size depends on level
+                    switch (levelNumber) {
+                        case 1:  // Pike - large open water
+                            width = Constants::PIKE_ROOM_WIDTH;
+                            height = Constants::PIKE_ROOM_HEIGHT;
+                            break;
+                        case 2:  // Lock Keeper - wide but short
+                            width = Constants::LOCKKEEPER_ROOM_WIDTH;
+                            height = Constants::LOCKKEEPER_ROOM_HEIGHT;
+                            break;
+                        case 3:  // Nanny - TBD
+                            width = Constants::NANNY_ROOM_WIDTH;
+                            height = Constants::NANNY_ROOM_HEIGHT;
+                            break;
+                        default:
+                            width = Constants::PIKE_ROOM_WIDTH;
+                            height = Constants::PIKE_ROOM_HEIGHT;
+                            break;
+                    }
                     break;
                 case RoomType::SHOP:
                 case RoomType::SPECIAL:

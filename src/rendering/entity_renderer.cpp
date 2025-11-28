@@ -553,7 +553,20 @@ void EntityRenderer::renderRoomObstacles(Tyra::Renderer2D* renderer,
             sprite.size = Tyra::Vec2(64.0f, 64.0f);
             sprite.offset = Tyra::Vec2(0.0f, 192.0f);  // Row 3 in mobs sheet
             sprite.position = screenPos;
-            sprite.scale = 0.5f; // tile size
+            sprite.scale = 0.5f;
+            
+            renderer->render(sprite);
+        } else if (obstacle.type == 1) {  // Arena barrier / wall
+            // Use a solid colored sprite or a wall tile
+            Tyra::Sprite sprite;
+            sprite.id = trolleySprite.id;  // Reuse mobs sheet for now
+            sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+            sprite.size = Tyra::Vec2(obstacle.size.x * Constants::TILE_SIZE, 
+                                     obstacle.size.y * Constants::TILE_SIZE);
+            sprite.offset = Tyra::Vec2(0.0f, 224.0f);  // Row 4 or use a different sprite
+            sprite.position = screenPos;
+            sprite.scale = 1.0f;
+            sprite.color = Tyra::Color(100.0f, 60.0f, 40.0f, 200.0f);  // Brownish tint
             
             renderer->render(sprite);
         }

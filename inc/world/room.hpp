@@ -28,11 +28,16 @@ enum class RoomType {
  */
 struct RoomObstacle {
     Tyra::Vec2 position;      // Tile position
+    Tyra::Vec2 size;          // Size in tiles (default 1x1)
     int type;                 // Obstacle type (0 = trolley, etc.)
     bool blocksPlayer;        // Player cannot walk through
     bool blocksEnemies;       // Enemies cannot walk through
     bool blocksPlayerShots;   // Player projectiles collide
     bool blocksEnemyShots;    // Enemy projectiles collide
+    
+    RoomObstacle() : position(0, 0), size(1.0f, 1.0f), type(0),
+                     blocksPlayer(true), blocksEnemies(true),
+                     blocksPlayerShots(true), blocksEnemyShots(true) {}
 };
 
 /**
@@ -62,7 +67,8 @@ public:
     bool hasObstacleAt(float x, float y) const;
     
     // Arena shrinking (for Lock Keeper boss)
-    void shrinkArena(float amount);  // Shrink from edges
+    void shrinkArena(float amount);            // Shrink from all edges
+    void shrinkArenaHorizontal(float amount);  // Shrink left/right only
     float getArenaMinX() const { return arenaMinX; }
     float getArenaMaxX() const { return arenaMaxX; }
     float getArenaMinY() const { return arenaMinY; }
