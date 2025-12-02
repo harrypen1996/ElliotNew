@@ -101,7 +101,7 @@ namespace Cheats {
     constexpr bool ROOMS_PRE_CLEARED = false;
     
     // Skip straight to boss room
-    constexpr bool SKIP_TO_BOSS = false;
+    constexpr bool SKIP_TO_BOSS = true;
     
     // Infinite submerge (no cooldown/duration limit)
     constexpr bool INFINITE_SUBMERGE = false;

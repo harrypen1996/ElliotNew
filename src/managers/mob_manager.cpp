@@ -756,6 +756,15 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
             // Phase 2: Shrink horizontally by 3 tiles on each side
             float shrinkAmount = 3.0f;
             room->shrinkArenaHorizontal(shrinkAmount);
+            
+            // Push player inward if they're in the new barrier zone
+            float newMinX = room->getArenaMinX();
+            float newMaxX = room->getArenaMaxX();
+            if (player->position.x < newMinX) {
+                player->position.x = newMinX + 0.5f;
+            } else if (player->position.x + 1.0f > newMaxX) {
+                player->position.x = newMaxX - 1.5f;
+            }
         } else if (mob.phase == 3) {
             // Phase 3: Shrink to minimum fighting space
             float currentWidth = room->getArenaMaxX() - room->getArenaMinX();
@@ -763,6 +772,15 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
             if (currentWidth > targetWidth) {
                 float shrinkAmount = (currentWidth - targetWidth) / 2.0f;
                 room->shrinkArenaHorizontal(shrinkAmount);
+                
+                // Push player inward if they're in the new barrier zone
+                float newMinX = room->getArenaMinX();
+                float newMaxX = room->getArenaMaxX();
+                if (player->position.x < newMinX) {
+                    player->position.x = newMinX + 0.5f;
+                } else if (player->position.x + 1.0f > newMaxX) {
+                    player->position.x = newMaxX - 1.5f;
+                }
             }
         }
     }
