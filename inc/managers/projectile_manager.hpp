@@ -25,6 +25,9 @@ public:
     // Spawn accelerating projectile (starts slow, speeds up)
     void spawnAcceleratingProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage, 
                                       float acceleration, float maxSpeed, bool fromPlayer = false);
+    
+    // Spawn barge (large projectile that hits submerged players)
+    void spawnBarge(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage);
 
     // Update all projectiles
     void update(Room* currentRoom);
@@ -39,6 +42,9 @@ public:
     // Get only player or enemy projectiles
     std::vector<Projectile*> getPlayerProjectiles();
     std::vector<Projectile*> getEnemyProjectiles();
+    
+    // Low-level add (for compatibility)
+    void addProjectile(const Projectile& projectile);
 
 private:
     void removeDestroyedProjectiles();

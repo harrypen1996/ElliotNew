@@ -15,7 +15,9 @@ Projectile::Projectile()
       distanceTraveled(0.0f),
       maxRange(10.0f),
       acceleration(0.0f),
-      maxSpeed(1.0f) {
+      maxSpeed(1.0f),
+      hitsSubmerged(false),
+      projectileType(ProjectileType::DEFAULT) {
 }
 
 Projectile::Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool playerOwned)
@@ -25,7 +27,9 @@ Projectile::Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool playerOwn
       distanceTraveled(0.0f),
       maxRange(10.0f),
       acceleration(0.0f),
-      maxSpeed(1.0f) {
+      maxSpeed(1.0f),
+      hitsSubmerged(false),
+      projectileType(ProjectileType::DEFAULT) {
     velocity = vel;
 }
 

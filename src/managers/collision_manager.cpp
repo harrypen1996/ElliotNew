@@ -402,8 +402,8 @@ void CollisionManager::checkProjectilePlayerCollisions(ProjectileManager* projec
                                                         Player* player) {
     if (!projectileManager || !player) return;
     
-    // Player is immune while submerged or invincible
-    if (player->isSubmerged() || player->isInvincible()) return;
+    // Player is immune while invincible
+    if (player->isInvincible()) return;
     
     Tyra::Vec2 playerSize(Constants::PLAYER_SIZE / Constants::TILE_SIZE,
                           Constants::PLAYER_SIZE / Constants::TILE_SIZE);
@@ -411,8 +411,12 @@ void CollisionManager::checkProjectilePlayerCollisions(ProjectileManager* projec
     for (auto& projectile : projectileManager->getProjectiles()) {
         if (!projectile.isActive() || projectile.isFromPlayer()) continue;
         
-        Tyra::Vec2 projSize(Constants::PROJECTILE_SIZE / Constants::TILE_SIZE,
-                            Constants::PROJECTILE_SIZE / Constants::TILE_SIZE);
+        // Skip if player is submerged and this projectile doesn't hit submerged
+        if (player->isSubmerged() && !projectile.getHitsSubmerged()) continue;
+        
+        // Use projectile's actual size (important for barges which are larger)
+        Tyra::Vec2 projSize(projectile.size.x / Constants::TILE_SIZE,
+                            projectile.size.y / Constants::TILE_SIZE);
         
         if (checkAABB(projectile.position, projSize, player->position, playerSize)) {
             int damage = static_cast<int>(projectile.getDamage());
@@ -438,7 +442,11 @@ bool CollisionManager::checkTileCollision(Room* room, float x, float y, bool isS
     }
     
     // Scenery tiles (doors) block unless submerged
-    if (!isSubmerged && room->getSceneryTile(tileX, tileY) != 0) {
+    //if (!isSubmerged && room->getSceneryTile(tileX, tileY) != 0) {
+    //    return true;
+    //}
+
+    if (room->getSceneryTile(tileX, tileY) != 0) {
         return true;
     }
     

@@ -55,7 +55,15 @@ enum class MobState {
     LOCKKEEPER_THROW_WINDUP,// Winding up to throw trolley
     LOCKKEEPER_THROWING,    // Throwing trolley
     LOCKKEEPER_STUNNED,     // Brief recovery after attack
-    LOCKKEEPER_SHOT         // Firing accelerating warning shots
+    LOCKKEEPER_SHOT,        // Firing accelerating warning shots
+    
+    // Nanny-specific states
+    NANNY_IDLE,             // Waiting at top of room
+    NANNY_ATTACKING,        // Normal attack phase
+    NANNY_GAUNTLET_START,   // Starting gauntlet - teleport player
+    NANNY_GAUNTLET_ACTIVE,  // Gauntlet in progress - spawning barges
+    NANNY_GAUNTLET_END,     // Player reached top, gauntlet complete
+    NANNY_STUNNED           // Vulnerable after gauntlet
 };
 
 class MobManager {
@@ -112,6 +120,13 @@ public:
         Tyra::Vec2 shotPosition; // Current position of warning shot projectile
         float shotSpeed;         // Current speed of shot (accelerates)
         
+        // Nanny boss specific
+        int gauntletNumber;      // Which gauntlet (1 or 2)
+        float bargeSpawnTimer;   // Timer for spawning barges
+        float gauntletStartY;    // Y position player must reach to end gauntlet
+        bool gauntlet1Complete;  // Tracks if first gauntlet done
+        bool gauntlet2Complete;  // Tracks if second gauntlet done
+        
         // For rendering
         bool facingRight;
         float rotation;          // For pike rotation during attacks
@@ -123,6 +138,8 @@ public:
                     circleAngle(0), chargeSpeed(0), attackPattern(0), phase(1),
                     tailSweepAngle(0), ringRadius(0), ringThickness(0.5f),
                     trolleyProgress(0), trolleysThrown(0), shotSpeed(0),
+                    gauntletNumber(0), bargeSpawnTimer(0), gauntletStartY(0),
+                    gauntlet1Complete(false), gauntlet2Complete(false),
                     facingRight(true), rotation(0) {}
     };
     

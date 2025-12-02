@@ -11,6 +11,14 @@ namespace CanalUx {
 
 class Room;  // Forward declaration
 
+// Projectile types for rendering different sprites
+enum class ProjectileType {
+    DEFAULT = 0,
+    BARGE = 1,      // Nanny boss barges - wide, hits submerged
+    FEATHER = 2,    // Swan feathers
+    RING = 3        // Lock Keeper ring shockwave pieces
+};
+
 class Projectile : public Entity {
 public:
     Projectile();
@@ -34,6 +42,14 @@ public:
     void setAcceleration(float accel) { acceleration = accel; }
     float getAcceleration() const { return acceleration; }
     void setMaxSpeed(float speed) { maxSpeed = speed; }
+    
+    // Submerged hitting - barges hit even when player is submerged
+    void setHitsSubmerged(bool hits) { hitsSubmerged = hits; }
+    bool getHitsSubmerged() const { return hitsSubmerged; }
+    
+    // Projectile type for rendering
+    void setProjectileType(ProjectileType t) { projectileType = t; }
+    ProjectileType getProjectileType() const { return projectileType; }
 
     // Destruction
     void destroy() { active = false; }
@@ -48,6 +64,8 @@ private:
     float maxRange;
     float acceleration;  // Speed increase per frame (0 = no acceleration)
     float maxSpeed;      // Maximum speed cap
+    bool hitsSubmerged;  // If true, hits player even when submerged
+    ProjectileType projectileType;
 };
 
 }  // namespace CanalUx

@@ -54,9 +54,13 @@ constexpr int LOCKKEEPER_ROOM_WIDTH = 28;
 constexpr int LOCKKEEPER_ROOM_HEIGHT = 14;  // Minimum height, no vertical space
 constexpr int LOCKKEEPER_ROOM_MIN_WIDTH = 12;  // Shrinks to this in phase 3
 
-// Level 3 - Nanny: TBD
-constexpr int NANNY_ROOM_WIDTH = 20;
-constexpr int NANNY_ROOM_HEIGHT = 18;
+// Level 3 - Nanny: Narrow but tall, gauntlet phases with barges
+constexpr int NANNY_ROOM_WIDTH = 16;   // Narrow - min width
+constexpr int NANNY_ROOM_HEIGHT = 28;  // Very tall for gauntlet run
+constexpr float NANNY_BARGE_SPEED_1 = 0.12f;   // Gauntlet 1 barge speed
+constexpr float NANNY_BARGE_SPEED_2 = 0.16f;   // Gauntlet 2 barge speed (faster)
+constexpr float NANNY_BARGE_INTERVAL_1 = 45.0f;  // Frames between barges (gauntlet 1)
+constexpr float NANNY_BARGE_INTERVAL_2 = 30.0f;  // Frames between barges (gauntlet 2)
 
 // Game progression
 constexpr int TOTAL_LEVELS = 3;  // 3 canal sections to escape
@@ -95,7 +99,7 @@ namespace Cheats {
     constexpr bool ONE_HIT_KILLS = false;
     
     // Start at specific level (0 = normal, 1-3 = skip to that level)
-    constexpr int START_LEVEL = 2;
+    constexpr int START_LEVEL = 3;
     
     // Rooms start cleared (no enemies, doors open)
     constexpr bool ROOMS_PRE_CLEARED = false;

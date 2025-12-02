@@ -78,11 +78,14 @@ void MobManager::spawnMobsForRoom(Room* room, int levelNumber) {
             case 3:
                 // NANNY
                 boss.type = MobType::BOSS_NANNY;
-                boss.size = Tyra::Vec2(64.0f, 64.0f);
-                boss.health = 35.0f;
+                boss.size = Tyra::Vec2(128.0f, 128.0f);  // Large boss (4x4 tiles)
+                boss.health = 40.0f;
                 boss.maxHealth = boss.health;
-                boss.speed = 0.015f;
-                boss.state = MobState::IDLE;
+                boss.speed = 0.0f;  // Nanny doesn't move
+                boss.state = MobState::NANNY_IDLE;
+                boss.gauntlet1Complete = false;
+                boss.gauntlet2Complete = false;
+                boss.gauntletNumber = 0;
                 TYRA_LOG("MobManager: Spawned NANNY boss");
                 break;
                 
@@ -989,9 +992,206 @@ void MobManager::updateLockKeeperBoss(MobData& mob, Room* room, Player* player, 
 }
 
 void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, ProjectileManager* projectileManager) {
-    // TODO: Level 3 boss - Nanny
-    // For now, use generic boss behavior
-    updateBoss(mob, room, player, projectileManager);
+    /*
+     * NANNY BOSS - Level 3
+     * 
+     * Room: Narrow but very tall (14 x 28)
+     * Nanny stays at top of room
+     * 
+     * Normal Phase: Shoots projectiles down at player
+     * 
+     * Gauntlet Phases (at 66% and 33% HP):
+     * - Player teleported to bottom
+     * - Must navigate up while barges cross from sides
+     * - Barges are instant kill (unless submerged)
+     * - Gauntlet 2 is harder (faster barges, shorter intervals)
+     * - Nanny vulnerable after player completes gauntlet
+     */
+    
+    float roomWidth = static_cast<float>(room->getWidth());
+    float roomHeight = static_cast<float>(room->getHeight());
+    
+    // Nanny stays at top of room
+    const float bossY = 2.0f;
+    mob.position.y = bossY;
+    
+    // Center horizontally
+    mob.position.x = roomWidth / 2.0f - 2.0f;  // Centered (4 tiles wide)
+    
+    // Player distance
+    float dx = player->position.x - mob.position.x;
+    float dy = player->position.y - mob.position.y;
+    
+    // Update phase based on health
+    int oldPhase = mob.phase;
+    float healthPercent = mob.health / mob.maxHealth;
+    if (healthPercent <= 0.33f) {
+        mob.phase = 3;
+    } else if (healthPercent <= 0.66f) {
+        mob.phase = 2;
+    } else {
+        mob.phase = 1;
+    }
+    
+    // Check for gauntlet trigger on phase transition
+    if (mob.phase > oldPhase) {
+        if (mob.phase == 2 && !mob.gauntlet1Complete) {
+            // Start gauntlet 1
+            mob.state = MobState::NANNY_GAUNTLET_START;
+            mob.stateTimer = 0;
+            mob.gauntletNumber = 1;
+        } else if (mob.phase == 3 && !mob.gauntlet2Complete) {
+            // Start gauntlet 2
+            mob.state = MobState::NANNY_GAUNTLET_START;
+            mob.stateTimer = 0;
+            mob.gauntletNumber = 2;
+        }
+    }
+    
+    // Facing direction
+    mob.facingRight = dx > 0;
+    
+    mob.stateTimer++;
+    if (mob.actionCooldown > 0) mob.actionCooldown--;
+    
+    switch (mob.state) {
+        case MobState::NANNY_IDLE:
+        case MobState::NANNY_ATTACKING: {
+            // Normal attack phase - shoot projectiles at player
+            if (mob.actionCooldown <= 0) {
+                // Shoot a spread of projectiles downward
+                int numShots = 1 + mob.phase;  // 2, 3, 4 shots per volley
+                float spreadAngle = 0.3f;
+                
+                for (int i = 0; i < numShots; i++) {
+                    float angle = -spreadAngle + (spreadAngle * 2.0f * i / (numShots - 1));
+                    if (numShots == 1) angle = 0;
+                    
+                    float velX = angle * 0.08f;
+                    float velY = 0.1f;  // Downward
+                    
+                    // Spawn projectile
+                    Projectile proj;
+                    proj.position = Tyra::Vec2(mob.position.x + 2.0f, mob.position.y + 4.0f);
+                    proj.velocity = Tyra::Vec2(velX, velY);
+                    proj.active = true;
+                    projectileManager->addProjectile(proj);
+                }
+                
+                // Cooldown between volleys
+                mob.actionCooldown = 60 - mob.phase * 10;  // 50, 40, 30 frames
+            }
+            
+            // Initialize state if just entering
+            if (mob.state == MobState::NANNY_IDLE) {
+                mob.state = MobState::NANNY_ATTACKING;
+            }
+            break;
+        }
+        
+        case MobState::NANNY_GAUNTLET_START: {
+            // Brief pause, then teleport player to bottom
+            if (mob.stateTimer >= 30) {  // 0.5 second warning
+                // Teleport player to bottom of room
+                player->position.x = roomWidth / 2.0f - 0.5f;
+                player->position.y = roomHeight - 3.0f;
+                player->velocity.x = 0;
+                player->velocity.y = 0;
+                
+                // Set goal line (player must reach this Y to complete gauntlet)
+                mob.gauntletStartY = bossY + 6.0f;  // A bit below the boss
+                
+                // Start spawning barges
+                mob.bargeSpawnTimer = 0;
+                mob.state = MobState::NANNY_GAUNTLET_ACTIVE;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::NANNY_GAUNTLET_ACTIVE: {
+            // Spawn barges from alternating sides
+            float bargeInterval = (mob.gauntletNumber == 1) ? 
+                Constants::NANNY_BARGE_INTERVAL_1 : Constants::NANNY_BARGE_INTERVAL_2;
+            float bargeSpeed = (mob.gauntletNumber == 1) ? 
+                Constants::NANNY_BARGE_SPEED_1 : Constants::NANNY_BARGE_SPEED_2;
+            
+            mob.bargeSpawnTimer++;
+            
+            if (mob.bargeSpawnTimer >= bargeInterval) {
+                mob.bargeSpawnTimer = 0;
+                
+                // Spawn barge at a random Y position in the gauntlet zone
+                float minY = mob.gauntletStartY + 2.0f;
+                float maxY = roomHeight - 4.0f;
+                float bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
+                
+                // Alternate sides, or random
+                bool fromLeft = (rand() % 2 == 0);
+                float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
+                float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
+                
+                // Spawn barge using the dedicated method
+                projectileManager->spawnBarge(
+                    Tyra::Vec2(bargeX, bargeY),
+                    Tyra::Vec2(bargeVelX, 0),
+                    999.0f  // Instant kill
+                );
+            }
+            
+            // Check if player reached the goal
+            if (player->position.y <= mob.gauntletStartY) {
+                mob.state = MobState::NANNY_GAUNTLET_END;
+                mob.stateTimer = 0;
+                
+                // Mark gauntlet complete
+                if (mob.gauntletNumber == 1) {
+                    mob.gauntlet1Complete = true;
+                } else {
+                    mob.gauntlet2Complete = true;
+                }
+                
+                // Clear all barges (projectiles)
+                projectileManager->clear();
+            }
+            
+            // Safety timeout - after 20 seconds, end gauntlet anyway
+            if (mob.stateTimer >= 1200) {
+                mob.state = MobState::NANNY_GAUNTLET_END;
+                mob.stateTimer = 0;
+                if (mob.gauntletNumber == 1) {
+                    mob.gauntlet1Complete = true;
+                } else {
+                    mob.gauntlet2Complete = true;
+                }
+                projectileManager->clear();
+            }
+            break;
+        }
+        
+        case MobState::NANNY_GAUNTLET_END: {
+            // Brief vulnerable period after gauntlet
+            if (mob.stateTimer >= 120) {  // 2 seconds vulnerable
+                mob.state = MobState::NANNY_ATTACKING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        case MobState::NANNY_STUNNED: {
+            // Recovery
+            if (mob.stateTimer >= 60) {
+                mob.state = MobState::NANNY_ATTACKING;
+                mob.stateTimer = 0;
+            }
+            break;
+        }
+        
+        default:
+            mob.state = MobState::NANNY_IDLE;
+            mob.stateTimer = 0;
+            break;
+    }
 }
 
 void MobManager::applyMobRepulsion() {

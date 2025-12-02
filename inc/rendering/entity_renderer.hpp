@@ -41,6 +41,7 @@ public:
     void renderMobs(Tyra::Renderer2D* renderer, const Camera* camera, const MobManager* mobManager);
     void renderPikeBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& pike, const Tyra::Vec2& screenPos);
     void renderLockKeeperBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& lk, const Tyra::Vec2& screenPos, const Room* room);
+    void renderNannyBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& nanny, const Tyra::Vec2& screenPos);
     void renderRoomObstacles(Tyra::Renderer2D* renderer, const Camera* camera, const Room* room);
 
 private:
@@ -52,6 +53,8 @@ private:
     Tyra::Sprite shadowSprite;  // Shadow for leaping entities (128x64)
     Tyra::Sprite lockKeeperSprite;  // Lock Keeper boss sprite
     Tyra::Sprite trolleySprite;  // Trolley obstacle/projectile
+    Tyra::Sprite nannySprite;  // Nanny boss sprite (128x128)
+    Tyra::Sprite bargeSprite;  // Barge projectile (96x32)
     
     int flashCounter;  // For invincibility flash effect
 };

@@ -31,6 +31,18 @@ void ProjectileManager::spawnAcceleratingProjectile(Tyra::Vec2 position, Tyra::V
     projectiles.back().setMaxRange(25.0f);  // Longer range for accelerating projectiles
 }
 
+void ProjectileManager::spawnBarge(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage) {
+    projectiles.emplace_back(position, velocity, damage, false);
+    projectiles.back().size = Tyra::Vec2(96.0f, 32.0f);  // 3 tiles wide, 1 tile tall
+    projectiles.back().setHitsSubmerged(true);  // Barges hit submerged players!
+    projectiles.back().setProjectileType(ProjectileType::BARGE);
+    projectiles.back().setMaxRange(50.0f);  // Long range to cross the room
+}
+
+void ProjectileManager::addProjectile(const Projectile& projectile) {
+    projectiles.push_back(projectile);
+}
+
 void ProjectileManager::update(Room* currentRoom) {
     for (auto& projectile : projectiles) {
         projectile.update(currentRoom);

@@ -86,6 +86,22 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     trolleySprite.size = Tyra::Vec2(64.0f, 64.0f);
     trolleySprite.id = mobSprite.id;  // Share texture with mob sprite sheet
     
+    // Load Nanny boss sprite (128x128)
+    filepath = Tyra::FileUtils::fromCwd("nanny_placeholder.png");
+    auto* nannyTexture = textureRepo->add(filepath);
+    
+    nannySprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    nannySprite.size = Tyra::Vec2(128.0f, 128.0f);
+    nannyTexture->addLink(nannySprite.id);
+    
+    // Load barge sprite (96x32)
+    filepath = Tyra::FileUtils::fromCwd("barge_placeholder.png");
+    auto* bargeTexture = textureRepo->add(filepath);
+    
+    bargeSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    bargeSprite.size = Tyra::Vec2(96.0f, 32.0f);
+    bargeTexture->addLink(bargeSprite.id);
+    
     TYRA_LOG("EntityRenderer: Initialized");
 }
 
@@ -97,6 +113,8 @@ void EntityRenderer::cleanup(Tyra::TextureRepository* textureRepo) {
     textureRepo->freeBySprite(pikeSprite);
     textureRepo->freeBySprite(shadowSprite);
     textureRepo->freeBySprite(lockKeeperSprite);
+    textureRepo->freeBySprite(nannySprite);
+    textureRepo->freeBySprite(bargeSprite);
     // Note: trolleySprite shares texture with mobSprite, don't free separately
     // Note: ringSprite no longer used - ring attack uses projectiles
 }
@@ -158,31 +176,48 @@ void EntityRenderer::renderProjectiles(Tyra::Renderer2D* renderer,
         
         Tyra::Vec2 screenPos = camera->worldToScreen(projectile.position);
         
-        // Create sprite for this projectile
-        Tyra::Sprite sprite;
-        sprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
-        sprite.position = screenPos;
-        sprite.id = projectileSprite.id;
-        sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
-        
-        // Use different tile for player vs enemy projectiles
-        int tileIndex;
-        if (projectile.isFromPlayer()) {
-            tileIndex = 98;   // Player projectile
+        // Check projectile type for special rendering
+        if (projectile.getProjectileType() == ProjectileType::BARGE) {
+            // Render barge using barge sprite
+            Tyra::Sprite sprite;
+            sprite.id = bargeSprite.id;
+            sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+            sprite.size = Tyra::Vec2(96.0f, 32.0f);  // 3 tiles x 1 tile
+            sprite.position = screenPos;
+            
+            // Flip sprite if moving right to left
+            if (projectile.velocity.x < 0) {
+                sprite.flipHorizontal = true;
+            }
+            
+            renderer->render(sprite);
         } else {
-            tileIndex = 99;   // Enemy projectile (feather) - adjust as needed
+            // Default projectile rendering
+            Tyra::Sprite sprite;
+            sprite.size = Tyra::Vec2(Constants::PROJECTILE_SIZE, Constants::PROJECTILE_SIZE);
+            sprite.position = screenPos;
+            sprite.id = projectileSprite.id;
+            sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+            
+            // Use different tile for player vs enemy projectiles
+            int tileIndex;
+            if (projectile.isFromPlayer()) {
+                tileIndex = 98;   // Player projectile
+            } else {
+                tileIndex = 99;   // Enemy projectile (feather) - adjust as needed
+            }
+            
+            int tilesPerRow = 256 / 16;
+            int column = tileIndex % tilesPerRow;
+            int row = tileIndex / tilesPerRow;
+            
+            sprite.offset = Tyra::Vec2(
+                static_cast<float>(column * 16),
+                static_cast<float>(row * 16)
+            );
+            
+            renderer->render(sprite);
         }
-        
-        int tilesPerRow = 256 / 16;
-        int column = tileIndex % tilesPerRow;
-        int row = tileIndex / tilesPerRow;
-        
-        sprite.offset = Tyra::Vec2(
-            static_cast<float>(column * 16),
-            static_cast<float>(row * 16)
-        );
-        
-        renderer->render(sprite);
     }
 }
 
@@ -212,6 +247,12 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         // Handle Lock Keeper boss specially
         if (mob.type == MobType::BOSS_LOCKKEEPER) {
             renderLockKeeperBoss(renderer, mob, screenPos, nullptr);
+            continue;
+        }
+        
+        // Handle Nanny boss specially
+        if (mob.type == MobType::BOSS_NANNY) {
+            renderNannyBoss(renderer, mob, screenPos);
             continue;
         }
         
@@ -537,6 +578,67 @@ void EntityRenderer::renderLockKeeperBoss(Tyra::Renderer2D* renderer,
     }
 }
 
+void EntityRenderer::renderNannyBoss(Tyra::Renderer2D* renderer, 
+                                      const MobManager::MobData& nanny, 
+                                      const Tyra::Vec2& screenPos) {
+    Tyra::Sprite sprite;
+    sprite.id = nannySprite.id;
+    sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    sprite.size = Tyra::Vec2(128.0f, 128.0f);
+    sprite.position = screenPos;
+    
+    // Flip based on facing direction
+    sprite.flipHorizontal = !nanny.facingRight;
+    
+    // Flash red during gauntlet
+    if (nanny.state == MobState::NANNY_GAUNTLET_ACTIVE) {
+        // Pulsing red tint during gauntlet
+        float pulse = std::sin(nanny.stateTimer * 0.1f) * 0.5f + 0.5f;
+        sprite.color = Tyra::Color(255, 100 + pulse * 100, 100 + pulse * 100, 255);
+    }
+    
+    // Flash white when stunned/vulnerable after gauntlet
+    if (nanny.state == MobState::NANNY_GAUNTLET_END) {
+        int flash = static_cast<int>(nanny.stateTimer) % 10;
+        if (flash < 5) {
+            sprite.color = Tyra::Color(255, 255, 200, 255);
+        }
+    }
+    
+    // Dim when stunned
+    if (nanny.state == MobState::NANNY_STUNNED) {
+        sprite.color = Tyra::Color(150, 150, 150, 255);
+    }
+    
+    renderer->render(sprite);
+    
+    // Render health bar above boss
+    float healthPercent = nanny.health / nanny.maxHealth;
+    float barWidth = 100.0f;
+    float barHeight = 8.0f;
+    float barX = screenPos.x + 14.0f;  // Center above sprite
+    float barY = screenPos.y - 15.0f;
+    
+    // Background (dark red)
+    Tyra::Sprite bgBar;
+    bgBar.mode = Tyra::SpriteMode::MODE_STRETCH;
+    bgBar.size = Tyra::Vec2(barWidth, barHeight);
+    bgBar.position = Tyra::Vec2(barX, barY);
+    bgBar.color = Tyra::Color(80, 20, 20, 200);
+    renderer->render(bgBar);
+    
+    // Health (red to green gradient based on health)
+    Tyra::Sprite healthBar;
+    healthBar.mode = Tyra::SpriteMode::MODE_STRETCH;
+    healthBar.size = Tyra::Vec2(barWidth * healthPercent, barHeight);
+    healthBar.position = Tyra::Vec2(barX, barY);
+    healthBar.color = Tyra::Color(
+        static_cast<unsigned char>(255 * (1.0f - healthPercent)),
+        static_cast<unsigned char>(255 * healthPercent),
+        50, 255);
+    renderer->render(healthBar);
+}
+
 void EntityRenderer::renderRoomObstacles(Tyra::Renderer2D* renderer, 
                                           const Camera* camera, 
                                           const Room* room) {
@@ -553,7 +655,7 @@ void EntityRenderer::renderRoomObstacles(Tyra::Renderer2D* renderer,
             sprite.size = Tyra::Vec2(64.0f, 64.0f);
             sprite.offset = Tyra::Vec2(0.0f, 192.0f);  // Row 3 in mobs sheet
             sprite.position = screenPos;
-            sprite.scale = 0.5f;
+            sprite.scale = 1.0f;
             
             renderer->render(sprite);
         } else if (obstacle.type == 1) {  // Arena barrier / wall
