@@ -310,6 +310,11 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         
         // Scale sprite to match mob size (mob.size is in pixels)
         sprite.scale = mob.size.x / tileSize;
+
+        // Flip sprite based on facing direction
+        if (!mob.facingRight) {
+            sprite.flipHorizontal = true;
+        }
         
         renderer->render(sprite);
     }
@@ -475,6 +480,11 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
     sprite.offset = Tyra::Vec2(offsetX, offsetY);
     sprite.size = Tyra::Vec2(spriteWidth, spriteHeight);
     sprite.scale = scale;
+
+    // Flip sprite based on facing direction
+    if (!pike.facingRight) {
+        sprite.flipHorizontal = true;
+    }
     
     renderer->render(sprite);
 }
