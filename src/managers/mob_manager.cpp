@@ -1101,8 +1101,10 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                 // Set goal line (player must reach this Y to complete gauntlet)
                 mob.gauntletStartY = bossY + 6.0f;  // A bit below the boss
                 
-                // Start spawning barges
+                // Reset wave counter, barge timer, and projectile angle
                 mob.bargeSpawnTimer = 0;
+                mob.waveCounter = 0;
+                mob.circleAngle = 0;
                 mob.state = MobState::NANNY_GAUNTLET_ACTIVE;
                 mob.stateTimer = 0;
             }
@@ -1110,66 +1112,126 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
         }
         
         case MobState::NANNY_GAUNTLET_ACTIVE: {
-            // Spawn barges from side door positions
-            float bargeInterval = (mob.gauntletNumber == 1) ? 
-                Constants::NANNY_BARGE_INTERVAL_1 : Constants::NANNY_BARGE_INTERVAL_2;
+            // Spawn waves of barges with gaps for player to pass through
+            float waveInterval = (mob.gauntletNumber == 1) ? 
+                Constants::NANNY_WAVE_INTERVAL_1 : Constants::NANNY_WAVE_INTERVAL_2;
             float bargeSpeed = (mob.gauntletNumber == 1) ? 
                 Constants::NANNY_BARGE_SPEED_1 : Constants::NANNY_BARGE_SPEED_2;
+            int gapSize = (mob.gauntletNumber == 1) ? 
+                Constants::NANNY_GAP_SIZE_1 : Constants::NANNY_GAP_SIZE_2;
             
             mob.bargeSpawnTimer++;
             
-            if (mob.bargeSpawnTimer >= bargeInterval) {
+            if (mob.bargeSpawnTimer >= waveInterval) {
                 mob.bargeSpawnTimer = 0;
                 
                 // Get side doors from room
                 const auto& sideDoors = room->getSideDoors();
                 
-                float bargeY;
-                bool fromLeft;
-                
                 if (!sideDoors.empty()) {
-                    // Pick a random door to spawn from
-                    int doorIndex = rand() % static_cast<int>(sideDoors.size());
-                    const auto& door = sideDoors[doorIndex];
+                    // Separate doors by side
+                    std::vector<int> leftDoors;
+                    std::vector<int> rightDoors;
+                    for (size_t i = 0; i < sideDoors.size(); i++) {
+                        if (sideDoors[i].isLeftSide) {
+                            leftDoors.push_back(static_cast<int>(i));
+                        } else {
+                            rightDoors.push_back(static_cast<int>(i));
+                        }
+                    }
                     
-                    // Barge Y position matches the door's Y
-                    // Door opening is at yPosition-1 and yPosition, so center on yPosition-0.5
-                    bargeY = door.yPosition - 0.5f;
-                    fromLeft = door.isLeftSide;
+                    // Alternate which side the wave comes from
+                    mob.waveCounter++;
+                    bool fromLeft = (mob.waveCounter % 2 == 0);
+                    const std::vector<int>& activeDoors = fromLeft ? leftDoors : rightDoors;
+                    
+                    if (!activeDoors.empty()) {
+                        int numDoors = static_cast<int>(activeDoors.size());
+                        
+                        // Choose gap position (which doors to skip)
+                        // Gap shifts each wave to force player movement
+                        int gapStart = (mob.waveCounter / 2) % numDoors;
+                        
+                        // Spawn barges from all doors EXCEPT the gap
+                        for (int i = 0; i < numDoors; i++) {
+                            // Check if this door is part of the gap
+                            bool isGap = false;
+                            for (int g = 0; g < gapSize; g++) {
+                                if (i == (gapStart + g) % numDoors) {
+                                    isGap = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!isGap) {
+                                const auto& door = sideDoors[activeDoors[i]];
+                                float bargeY = door.yPosition - 0.5f;
+                                float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
+                                float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
+                                
+                                projectileManager->spawnBarge(
+                                    Tyra::Vec2(bargeX, bargeY),
+                                    Tyra::Vec2(bargeVelX, 0),
+                                    999.0f
+                                );
+                            }
+                        }
+                    }
                 } else {
-                    // Fallback: random Y position if no doors defined
+                    // Fallback if no doors - single random barge
                     float minY = mob.gauntletStartY + 2.0f;
                     float maxY = roomHeight - 4.0f;
-                    bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
-                    fromLeft = (rand() % 2 == 0);
+                    float bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
+                    bool fromLeft = (rand() % 2 == 0);
+                    float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
+                    float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
+                    
+                    projectileManager->spawnBarge(
+                        Tyra::Vec2(bargeX, bargeY),
+                        Tyra::Vec2(bargeVelX, 0),
+                        999.0f
+                    );
                 }
-                
-                // Set barge start position and velocity based on side
-                float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
-                float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
-                
-                // Spawn barge using the dedicated method
-                projectileManager->spawnBarge(
-                    Tyra::Vec2(bargeX, bargeY),
-                    Tyra::Vec2(bargeVelX, 0),
-                    999.0f  // Instant kill
-                );
             }
             
-            // Check if player reached the goal - this is the ONLY exit condition
-            // No timeout - player controls when gauntlet ends by reaching top
+            // Boss shoots projectiles during gauntlet in rotating pattern
+            if (mob.actionCooldown <= 0) {
+                // Rotating angle for circular spray pattern
+                float rotationSpeed = (mob.gauntletNumber == 1) ? 0.4f : 0.6f;
+                mob.circleAngle += rotationSpeed;
+                if (mob.circleAngle > 6.28f) mob.circleAngle -= 6.28f;
+                
+                // Shoot projectiles in current rotation direction
+                int numShots = (mob.gauntletNumber == 1) ? 2 : 3;
+                float projSpeed = (mob.gauntletNumber == 1) ? 0.06f : 0.08f;
+                
+                for (int i = 0; i < numShots; i++) {
+                    // Spread shots around the current angle
+                    float angle = mob.circleAngle + (6.28f / numShots) * i;
+                    float velX = std::cos(angle) * projSpeed;
+                    float velY = std::sin(angle) * projSpeed;
+                    
+                    Tyra::Vec2 projPos(mob.position.x + 2.0f, mob.position.y + 2.0f);
+                    Tyra::Vec2 projVel(velX, velY);
+                    
+                    projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f);
+                }
+                
+                // Faster firing during gauntlet 2
+                mob.actionCooldown = (mob.gauntletNumber == 1) ? 25.0f : 15.0f;
+            }
+            
+            // Check if player reached the goal
             if (player->position.y <= mob.gauntletStartY) {
                 mob.state = MobState::NANNY_GAUNTLET_END;
                 mob.stateTimer = 0;
                 
-                // Mark gauntlet complete
                 if (mob.gauntletNumber == 1) {
                     mob.gauntlet1Complete = true;
                 } else {
                     mob.gauntlet2Complete = true;
                 }
                 
-                // Clear all barges (projectiles)
                 projectileManager->clear();
             }
             break;

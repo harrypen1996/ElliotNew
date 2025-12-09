@@ -126,6 +126,7 @@ public:
         float gauntletStartY;    // Y position player must reach to end gauntlet
         bool gauntlet1Complete;  // Tracks if first gauntlet done
         bool gauntlet2Complete;  // Tracks if second gauntlet done
+        int waveCounter;         // Counts waves for gap positioning
         
         // For rendering
         bool facingRight;
@@ -139,7 +140,7 @@ public:
                     tailSweepAngle(0), ringRadius(0), ringThickness(0.5f),
                     trolleyProgress(0), trolleysThrown(0), shotSpeed(0),
                     gauntletNumber(0), bargeSpawnTimer(0), gauntletStartY(0),
-                    gauntlet1Complete(false), gauntlet2Complete(false),
+                    gauntlet1Complete(false), gauntlet2Complete(false), waveCounter(0),
                     facingRight(true), rotation(0) {}
     };
     

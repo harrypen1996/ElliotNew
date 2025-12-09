@@ -57,10 +57,12 @@ constexpr int LOCKKEEPER_ROOM_MIN_WIDTH = 12;  // Shrinks to this in phase 3
 // Level 3 - Nanny: Narrow but tall, gauntlet phases with barges
 constexpr int NANNY_ROOM_WIDTH = 16;   // Narrow - min width
 constexpr int NANNY_ROOM_HEIGHT = 28;  // Very tall for gauntlet run
-constexpr float NANNY_BARGE_SPEED_1 = 0.12f;   // Gauntlet 1 barge speed
-constexpr float NANNY_BARGE_SPEED_2 = 0.16f;   // Gauntlet 2 barge speed (faster)
-constexpr float NANNY_BARGE_INTERVAL_1 = 45.0f;  // Frames between barges (gauntlet 1)
-constexpr float NANNY_BARGE_INTERVAL_2 = 30.0f;  // Frames between barges (gauntlet 2)
+constexpr float NANNY_BARGE_SPEED_1 = 0.14f;   // Gauntlet 1 barge speed
+constexpr float NANNY_BARGE_SPEED_2 = 0.18f;   // Gauntlet 2 barge speed (faster)
+constexpr float NANNY_WAVE_INTERVAL_1 = 38.0f;  // Frames between barge waves (gauntlet 1)
+constexpr float NANNY_WAVE_INTERVAL_2 = 28.0f;  // Frames between barge waves (gauntlet 2)
+constexpr int NANNY_GAP_SIZE_1 = 1;    // Number of doors left open as gap (gauntlet 1)
+constexpr int NANNY_GAP_SIZE_2 = 1;    // Number of doors left open as gap (gauntlet 2)
 
 // Game progression
 constexpr int TOTAL_LEVELS = 3;  // 3 canal sections to escape
@@ -93,7 +95,7 @@ namespace Sprites {
 // ============================================
 namespace Cheats {
     // God mode - player can't take damage
-    constexpr bool GOD_MODE = true;
+    constexpr bool GOD_MODE = false;
     
     // Massive damage - one-shot everything
     constexpr bool ONE_HIT_KILLS = false;

@@ -244,11 +244,11 @@ void RoomGenerator::generateNannySideDoors(Room* room, int numDoorsPerSide) {
     //   doorY + 1: bottom edge frame
     //   doorY + 2: bottom corner frame
     
-    // Top buffer: boss at y~2, need room below + door top frame
-    // So first door's doorY-3 should be >= 8 (boss area), meaning doorY >= 11
-    float topBuffer = 11.0f;  // First doorY must be at least this
+    // Top buffer: boss at y~2 with 4-tile height, so boss ends around y=6
+    // First door's top frame (doorY-3) should be >= 7, meaning doorY >= 10
+    float topBuffer = 10.0f;  // First doorY must be at least this
     
-    // Bottom buffer: player starts at bottom, need clearance
+    // Bottom buffer: player starts at bottom (y = height-3)
     // Last door's doorY+2 should be < height-4, meaning doorY < height-6
     float bottomBuffer = 6.0f;
     
@@ -258,10 +258,10 @@ void RoomGenerator::generateNannySideDoors(Room* room, int numDoorsPerSide) {
     
     if (range <= 0 || numDoorsPerSide <= 0) return;
     
-    // Doors need at least 8 tiles spacing to avoid frame overlap:
+    // Doors need at least 6 tiles spacing to avoid frame overlap:
     // Door 1 bottom frame at doorY+2, Door 2 top frame at doorY-3
-    // If spacing = 8: door1+2 = Y+2, door2-3 = (Y+8)-3 = Y+5, gap of 3 tiles
-    float minSpacing = 8.0f;
+    // If spacing = 6: door1+2 = Y+2, door2-3 = (Y+6)-3 = Y+3, gap of 1 tile
+    float minSpacing = 6.0f;
     
     // Calculate how many doors we can actually fit
     int maxDoors = static_cast<int>(range / minSpacing) + 1;
