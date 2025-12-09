@@ -14,7 +14,7 @@ class Room;  // Forward declaration
 // Projectile types for rendering different sprites
 enum class ProjectileType {
     DEFAULT = 0,
-    BARGE = 1,      // Nanny boss barges - wide, hits submerged
+    BARGE = 1,      // Nanny boss barges - wide, hits submerged, ignores walls
     FEATHER = 2,    // Swan feathers
     RING = 3        // Lock Keeper ring shockwave pieces
 };
@@ -47,6 +47,10 @@ public:
     void setHitsSubmerged(bool hits) { hitsSubmerged = hits; }
     bool getHitsSubmerged() const { return hitsSubmerged; }
     
+    // Wall ignoring - barges pass through walls
+    void setIgnoresWalls(bool ignores) { ignoresWalls = ignores; }
+    bool getIgnoresWalls() const { return ignoresWalls; }
+    
     // Projectile type for rendering
     void setProjectileType(ProjectileType t) { projectileType = t; }
     ProjectileType getProjectileType() const { return projectileType; }
@@ -65,6 +69,7 @@ private:
     float acceleration;  // Speed increase per frame (0 = no acceleration)
     float maxSpeed;      // Maximum speed cap
     bool hitsSubmerged;  // If true, hits player even when submerged
+    bool ignoresWalls;   // If true, passes through walls (for barges)
     ProjectileType projectileType;
 };
 

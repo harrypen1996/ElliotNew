@@ -17,6 +17,7 @@ Projectile::Projectile()
       acceleration(0.0f),
       maxSpeed(1.0f),
       hitsSubmerged(false),
+      ignoresWalls(false),
       projectileType(ProjectileType::DEFAULT) {
 }
 
@@ -29,6 +30,7 @@ Projectile::Projectile(Tyra::Vec2 pos, Tyra::Vec2 vel, float dmg, bool playerOwn
       acceleration(0.0f),
       maxSpeed(1.0f),
       hitsSubmerged(false),
+      ignoresWalls(false),
       projectileType(ProjectileType::DEFAULT) {
     velocity = vel;
 }

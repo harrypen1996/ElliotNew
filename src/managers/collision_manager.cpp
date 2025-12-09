@@ -301,11 +301,18 @@ void CollisionManager::resolveMobWorldCollision(MobManager::MobData& mob, Room* 
 void CollisionManager::checkProjectileWorldCollision(Projectile& projectile, Room* room, bool isPlayerProjectile) {
     if (!room || !projectile.isActive()) return;
     
+    // IMPORTANT: If projectile ignores walls (e.g., barges), skip wall collision entirely
+    if (projectile.getIgnoresWalls()) {
+        // Only check dynamic obstacles that might still affect it
+        // For barges, we skip obstacle check too since they plow through everything
+        return;
+    }
+    
     float sizeInTiles = projectile.size.x / Constants::TILE_SIZE;
     int tileX = static_cast<int>(projectile.position.x);
     int tileY = static_cast<int>(projectile.position.y);
     
-    // Check tile collision (walls always block)
+    // Check tile collision (walls always block normal projectiles)
     if (room->getLandTile(tileX, tileY) != 0 ||
         room->getLandTile(static_cast<int>(projectile.position.x + sizeInTiles * 0.9f), tileY) != 0 ||
         room->getLandTile(tileX, static_cast<int>(projectile.position.y + sizeInTiles * 0.9f)) != 0) {

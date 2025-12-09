@@ -94,13 +94,21 @@ void EntityRenderer::init(Tyra::TextureRepository* textureRepo) {
     nannySprite.size = Tyra::Vec2(128.0f, 128.0f);
     nannyTexture->addLink(nannySprite.id);
     
-    // Load barge sprite (96x32)
-    filepath = Tyra::FileUtils::fromCwd("barge_placeholder.png");
+    // Load barge sprite (128x32 texture, displays 96x32)
+    filepath = Tyra::FileUtils::fromCwd("barge.png");
     auto* bargeTexture = textureRepo->add(filepath);
     
-    bargeSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
-    bargeSprite.size = Tyra::Vec2(96.0f, 32.0f);
+    bargeSprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+    bargeSprite.size = Tyra::Vec2(128.0f, 32.0f);  // Full texture size
     bargeTexture->addLink(bargeSprite.id);
+    
+    // Load pixel texture for solid colored rectangles (health bars, etc.)
+    filepath = Tyra::FileUtils::fromCwd("pixel.png");
+    auto* pixelTexture = textureRepo->add(filepath);
+    
+    pixelSprite.mode = Tyra::SpriteMode::MODE_STRETCH;
+    pixelSprite.size = Tyra::Vec2(1.0f, 1.0f);
+    pixelTexture->addLink(pixelSprite.id);
     
     TYRA_LOG("EntityRenderer: Initialized");
 }
@@ -115,8 +123,8 @@ void EntityRenderer::cleanup(Tyra::TextureRepository* textureRepo) {
     textureRepo->freeBySprite(lockKeeperSprite);
     textureRepo->freeBySprite(nannySprite);
     textureRepo->freeBySprite(bargeSprite);
+    textureRepo->freeBySprite(pixelSprite);
     // Note: trolleySprite shares texture with mobSprite, don't free separately
-    // Note: ringSprite no longer used - ring attack uses projectiles
 }
 
 void EntityRenderer::render(Tyra::Renderer2D* renderer, 
@@ -179,10 +187,12 @@ void EntityRenderer::renderProjectiles(Tyra::Renderer2D* renderer,
         // Check projectile type for special rendering
         if (projectile.getProjectileType() == ProjectileType::BARGE) {
             // Render barge using barge sprite
+            // Texture is 128x32, but we only display 96x32 (the actual barge)
             Tyra::Sprite sprite;
             sprite.id = bargeSprite.id;
-            sprite.mode = Tyra::SpriteMode::MODE_STRETCH;
-            sprite.size = Tyra::Vec2(96.0f, 32.0f);  // 3 tiles x 1 tile
+            sprite.mode = Tyra::SpriteMode::MODE_REPEAT;
+            sprite.size = Tyra::Vec2(96.0f, 32.0f);  // Display size (3 tiles x 1 tile)
+            sprite.offset = Tyra::Vec2(0.0f, 0.0f);  // Start from left of texture
             sprite.position = screenPos;
             
             // Flip sprite if moving right to left
@@ -619,8 +629,9 @@ void EntityRenderer::renderNannyBoss(Tyra::Renderer2D* renderer,
     float barX = screenPos.x + 14.0f;  // Center above sprite
     float barY = screenPos.y - 15.0f;
     
-    // Background (dark red)
+    // Background (dark red) - uses pixel texture for solid color
     Tyra::Sprite bgBar;
+    bgBar.id = pixelSprite.id;  // Use pixel texture
     bgBar.mode = Tyra::SpriteMode::MODE_STRETCH;
     bgBar.size = Tyra::Vec2(barWidth, barHeight);
     bgBar.position = Tyra::Vec2(barX, barY);
@@ -629,6 +640,7 @@ void EntityRenderer::renderNannyBoss(Tyra::Renderer2D* renderer,
     
     // Health (red to green gradient based on health)
     Tyra::Sprite healthBar;
+    healthBar.id = pixelSprite.id;  // Use pixel texture
     healthBar.mode = Tyra::SpriteMode::MODE_STRETCH;
     healthBar.size = Tyra::Vec2(barWidth * healthPercent, barHeight);
     healthBar.position = Tyra::Vec2(barX, barY);

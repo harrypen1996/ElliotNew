@@ -1,18 +1,18 @@
 /*
- * CanalUx - Entity Renderer
- * Handles rendering of all entities (player, mobs, projectiles)
+ * CanalUx - Entity Renderer Header
  */
 
 #pragma once
 
 #include <tyra>
 #include "core/constants.hpp"
-#include "managers/mob_manager.hpp"  // Need full definition for MobData
+#include "managers/mob_manager.hpp"
 
 namespace CanalUx {
 
-class Player;
+// Forward declarations
 class Camera;
+class Player;
 class ProjectileManager;
 class Room;
 
@@ -20,43 +20,62 @@ class EntityRenderer {
 public:
     EntityRenderer();
     ~EntityRenderer();
-
-    // Initialize with texture repository
-    void init(Tyra::TextureRepository* textureRepo);
     
-    // Clean up textures
+    void init(Tyra::TextureRepository* textureRepo);
     void cleanup(Tyra::TextureRepository* textureRepo);
-
-    // Render all entities
+    
     void render(Tyra::Renderer2D* renderer, 
                 const Camera* camera,
                 const Player* player,
                 const ProjectileManager* projectileManager,
                 const MobManager* mobManager,
-                const Room* room = nullptr);
-
-    // Individual render methods (can be called separately if needed)
-    void renderPlayer(Tyra::Renderer2D* renderer, const Camera* camera, const Player* player);
-    void renderProjectiles(Tyra::Renderer2D* renderer, const Camera* camera, const ProjectileManager* projectileManager);
-    void renderMobs(Tyra::Renderer2D* renderer, const Camera* camera, const MobManager* mobManager);
-    void renderPikeBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& pike, const Tyra::Vec2& screenPos);
-    void renderLockKeeperBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& lk, const Tyra::Vec2& screenPos, const Room* room);
-    void renderNannyBoss(Tyra::Renderer2D* renderer, const MobManager::MobData& nanny, const Tyra::Vec2& screenPos);
-    void renderRoomObstacles(Tyra::Renderer2D* renderer, const Camera* camera, const Room* room);
+                const Room* room);
 
 private:
+    void renderPlayer(Tyra::Renderer2D* renderer, 
+                      const Camera* camera, 
+                      const Player* player);
+    
+    void renderProjectiles(Tyra::Renderer2D* renderer, 
+                           const Camera* camera, 
+                           const ProjectileManager* projectileManager);
+    
+    void renderMobs(Tyra::Renderer2D* renderer, 
+                    const Camera* camera, 
+                    const MobManager* mobManager);
+    
+    void renderPikeBoss(Tyra::Renderer2D* renderer,
+                        const MobManager::MobData& pike,
+                        const Tyra::Vec2& screenPos);
+    
+    void renderLockKeeperBoss(Tyra::Renderer2D* renderer, 
+                               const MobManager::MobData& lk, 
+                               const Tyra::Vec2& screenPos,
+                               const Room* room);
+    
+    void renderNannyBoss(Tyra::Renderer2D* renderer, 
+                         const MobManager::MobData& nanny, 
+                         const Tyra::Vec2& screenPos);
+    
+    void renderRoomObstacles(Tyra::Renderer2D* renderer, 
+                              const Camera* camera, 
+                              const Room* room);
+    
+    // Sprites
     Tyra::Sprite playerSprite;
     Tyra::Sprite projectileSprite;
-    Tyra::Sprite mobSprite;  // Sprite sheet for all mobs
-    Tyra::Sprite submergedSprite;  // Sprite for submerged entities
-    Tyra::Sprite pikeSprite;  // Pike boss sprite (256x128)
-    Tyra::Sprite shadowSprite;  // Shadow for leaping entities (128x64)
-    Tyra::Sprite lockKeeperSprite;  // Lock Keeper boss sprite
-    Tyra::Sprite trolleySprite;  // Trolley obstacle/projectile
-    Tyra::Sprite nannySprite;  // Nanny boss sprite (128x128)
-    Tyra::Sprite bargeSprite;  // Barge projectile (96x32)
+    Tyra::Sprite mobSprite;
+    Tyra::Sprite submergedSprite;
+    Tyra::Sprite pikeSprite;
+    Tyra::Sprite shadowSprite;
+    Tyra::Sprite lockKeeperSprite;
+    Tyra::Sprite trolleySprite;
+    Tyra::Sprite nannySprite;
+    Tyra::Sprite bargeSprite;
+    Tyra::Sprite pixelSprite;  // For solid colored rectangles (health bars, etc.)
     
-    int flashCounter;  // For invincibility flash effect
+    // Flash effect counter for invincibility
+    int flashCounter;
 };
 
 }  // namespace CanalUx
