@@ -103,13 +103,13 @@ namespace Cheats {
     constexpr bool ONE_HIT_KILLS = false;
     
     // Start at specific level (0 = normal, 1-3 = skip to that level)
-    constexpr int START_LEVEL = 3;
+    constexpr int START_LEVEL = 1;
     
     // Rooms start cleared (no enemies, doors open)
     constexpr bool ROOMS_PRE_CLEARED = false;
     
     // Skip straight to boss room
-    constexpr bool SKIP_TO_BOSS = true;
+    constexpr bool SKIP_TO_BOSS = false;
     
     // Infinite submerge (no cooldown/duration limit)
     constexpr bool INFINITE_SUBMERGE = false;

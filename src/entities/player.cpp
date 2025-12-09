@@ -187,8 +187,13 @@ void Player::takeDamage(int amount) {
         return;
     }
     
-    if (isInvincible() || submerged) {
-        return;  // Can't take damage while invincible or underwater
+    // Can't take damage while invincible
+    // Note: Submerge protection is handled by CollisionManager
+    // - Mob collisions are blocked when submerged
+    // - Normal projectiles are blocked when submerged
+    // - Projectiles with hitsSubmerged flag (barges) CAN damage submerged players
+    if (isInvincible()) {
+        return;
     }
 
     stats.damage(amount);
