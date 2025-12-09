@@ -1057,34 +1057,118 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
     switch (mob.state) {
         case MobState::NANNY_IDLE:
         case MobState::NANNY_ATTACKING: {
-            // Normal attack phase - shoot projectiles at player
+            // Normal attack phase - multiple attack patterns
+            // Phase 1: Easiest (before gauntlet 1)
+            // Phase 2: Medium (after gauntlet 1)
+            // Phase 3: Hardest (after gauntlet 2) - but not overwhelming
             if (mob.actionCooldown <= 0) {
-                // Shoot a spread of projectiles downward
-                int numShots = 1 + mob.phase;  // 2, 3, 4 shots per volley
-                float spreadAngle = 0.3f;
+                int attackRoll = rand() % 100;
+                float projRange = 40.0f;
                 
-                for (int i = 0; i < numShots; i++) {
-                    float angle = -spreadAngle + (spreadAngle * 2.0f * i / (numShots - 1));
-                    if (numShots == 1) angle = 0;
-                    
-                    float velX = angle * 0.08f;
-                    float velY = 0.1f;  // Downward
-                    
-                    // Spawn projectile
-                    Projectile proj;
-                    proj.position = Tyra::Vec2(mob.position.x + 2.0f, mob.position.y + 4.0f);
-                    proj.velocity = Tyra::Vec2(velX, velY);
-                    proj.active = true;
-                    projectileManager->addProjectile(proj);
+                // Calculate direction to player
+                float aimDx = player->position.x - (mob.position.x + 2.0f);
+                float aimDy = player->position.y - (mob.position.y + 4.0f);
+                float aimLen = std::sqrt(aimDx * aimDx + aimDy * aimDy);
+                if (aimLen < 0.1f) aimLen = 1.0f;  // Prevent division by zero
+                float dirX = aimDx / aimLen;
+                float dirY = aimDy / aimLen;
+                
+                // Per-phase settings - difficulty increases with phase
+                int numSpreadShots, numAimedShots;
+                float projSpeed, spreadAngle, cooldownBase;
+                
+                if (mob.phase == 1) {
+                    // Phase 1: Easy
+                    numSpreadShots = 3;
+                    numAimedShots = 1;
+                    projSpeed = 0.06f;
+                    spreadAngle = 0.3f;
+                    cooldownBase = 55.0f;
+                } else if (mob.phase == 2) {
+                    // Phase 2: Medium
+                    numSpreadShots = 4;
+                    numAimedShots = 2;
+                    projSpeed = 0.07f;
+                    spreadAngle = 0.4f;
+                    cooldownBase = 45.0f;
+                } else {
+                    // Phase 3: Hard but manageable
+                    numSpreadShots = 4;
+                    numAimedShots = 2;
+                    projSpeed = 0.08f;
+                    spreadAngle = 0.45f;
+                    cooldownBase = 40.0f;
                 }
                 
-                // Cooldown between volleys
-                mob.actionCooldown = 60 - mob.phase * 10;  // 50, 40, 30 frames
+                if (attackRoll < 40) {
+                    // Pattern 1: Spread shot aimed at player
+                    // Calculate base angle toward player
+                    float baseAngle = std::atan2(dirY, dirX);
+                    
+                    for (int i = 0; i < numSpreadShots; i++) {
+                        float t = (numSpreadShots > 1) ? (float)i / (numSpreadShots - 1) : 0.5f;
+                        float angle = baseAngle + spreadAngle * (t - 0.5f);
+                        
+                        float velX = std::cos(angle) * projSpeed;
+                        float velY = std::sin(angle) * projSpeed;
+                        
+                        Tyra::Vec2 projPos(mob.position.x + 2.0f, mob.position.y + 4.0f);
+                        projectileManager->spawnEnemyProjectile(projPos, Tyra::Vec2(velX, velY), 1.0f, projRange);
+                    }
+                    mob.actionCooldown = cooldownBase;
+                    
+                } else if (attackRoll < 70) {
+                    // Pattern 2: Aimed burst at player
+                    for (int i = 0; i < numAimedShots; i++) {
+                        // Perpendicular spread
+                        float spreadOffset = (i - (numAimedShots - 1) / 2.0f) * 0.15f;
+                        float velX = dirX * projSpeed + spreadOffset * (-dirY);
+                        float velY = dirY * projSpeed + spreadOffset * dirX;
+                        
+                        Tyra::Vec2 projPos(mob.position.x + 2.0f, mob.position.y + 4.0f);
+                        projectileManager->spawnEnemyProjectile(projPos, Tyra::Vec2(velX, velY), 1.0f, projRange);
+                    }
+                    mob.actionCooldown = cooldownBase * 0.8f;
+                    
+                } else {
+                    // Pattern 3: Sweeping arc centered on player
+                    mob.attackPattern = 1;
+                    // Store the base angle toward player for the sweep
+                    float baseAngle = std::atan2(dirY, dirX);
+                    mob.circleAngle = baseAngle - 0.5f;  // Start sweep left of player
+                    mob.tailSweepAngle = baseAngle + 0.5f;  // End sweep right of player
+                    mob.actionCooldown = 5;
+                }
+            }
+            
+            // Handle sweeping arc attack
+            if (mob.attackPattern == 1) {
+                float projRange = 40.0f;
+                float sweepSpeed = (mob.phase == 1) ? 0.06f : (mob.phase == 2) ? 0.08f : 0.09f;
+                float projSpeed = (mob.phase == 1) ? 0.05f : (mob.phase == 2) ? 0.06f : 0.07f;
+                float fireRate = (mob.phase == 1) ? 6.0f : (mob.phase == 2) ? 5.0f : 4.0f;
+                
+                mob.circleAngle += sweepSpeed;
+                
+                float velX = std::cos(mob.circleAngle) * projSpeed;
+                float velY = std::sin(mob.circleAngle) * projSpeed;
+                
+                Tyra::Vec2 projPos(mob.position.x + 2.0f, mob.position.y + 4.0f);
+                projectileManager->spawnEnemyProjectile(projPos, Tyra::Vec2(velX, velY), 1.0f, projRange);
+                
+                // End sweep when past the target angle
+                if (mob.circleAngle > mob.tailSweepAngle) {
+                    mob.attackPattern = 0;
+                    mob.actionCooldown = (mob.phase == 1) ? 70.0f : (mob.phase == 2) ? 55.0f : 45.0f;
+                } else {
+                    mob.actionCooldown = fireRate;
+                }
             }
             
             // Initialize state if just entering
             if (mob.state == MobState::NANNY_IDLE) {
                 mob.state = MobState::NANNY_ATTACKING;
+                mob.attackPattern = 0;
             }
             break;
         }
@@ -1092,6 +1176,9 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
         case MobState::NANNY_GAUNTLET_START: {
             // Brief pause, then teleport player to bottom
             if (mob.stateTimer >= 30) {  // 0.5 second warning
+                // Clear any existing projectiles
+                projectileManager->clear();
+                
                 // Teleport player to bottom of room
                 player->position.x = roomWidth / 2.0f - 0.5f;
                 player->position.y = roomHeight - 3.0f;
@@ -1099,7 +1186,8 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                 player->velocity.y = 0;
                 
                 // Set goal line (player must reach this Y to complete gauntlet)
-                mob.gauntletStartY = bossY + 6.0f;  // A bit below the boss
+                // First door is at Y=16, so goal at Y=12 gives buffer after clearing barges
+                mob.gauntletStartY = bossY + 10.0f;
                 
                 // Reset wave counter, barge timer, and projectile angle
                 mob.bargeSpawnTimer = 0;
@@ -1118,13 +1206,15 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
             
             float bargeSpeed = (mob.gauntletNumber == 1) ? 
                 Constants::NANNY_BARGE_SPEED_1 : Constants::NANNY_BARGE_SPEED_2;
+            float spawnInterval = (mob.gauntletNumber == 1) ?
+                Constants::NANNY_BARGE_SPAWN_INTERVAL_1 : Constants::NANNY_BARGE_SPAWN_INTERVAL_2;
             int minGaps = (mob.gauntletNumber == 1) ? 
                 Constants::NANNY_MIN_GAPS_1 : Constants::NANNY_MIN_GAPS_2;
             
             mob.bargeSpawnTimer++;
             
-            // Spawn barges frequently to create continuous stream
-            if (mob.bargeSpawnTimer >= Constants::NANNY_BARGE_SPAWN_INTERVAL) {
+            // Spawn barges at calculated interval to create back-to-back stream
+            if (mob.bargeSpawnTimer >= spawnInterval) {
                 mob.bargeSpawnTimer = 0;
                 
                 // Get side doors from room
@@ -1186,6 +1276,7 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                 
                 int numShots = (mob.gauntletNumber == 1) ? 2 : 3;
                 float projSpeed = (mob.gauntletNumber == 1) ? 0.08f : 0.10f;
+                float projRange = 50.0f;  // Long range to reach player at bottom of room
                 
                 for (int i = 0; i < numShots; i++) {
                     float angle = mob.circleAngle + (6.28f / numShots) * i;
@@ -1195,7 +1286,7 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                     Tyra::Vec2 projPos(mob.position.x + 2.0f, mob.position.y + 2.0f);
                     Tyra::Vec2 projVel(velX, velY);
                     
-                    projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f);
+                    projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f, projRange);
                 }
                 
                 mob.actionCooldown = (mob.gauntletNumber == 1) ? 20.0f : 12.0f;

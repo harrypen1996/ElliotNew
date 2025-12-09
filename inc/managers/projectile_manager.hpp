@@ -21,6 +21,7 @@ public:
     // Spawning
     void spawnPlayerProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage);
     void spawnEnemyProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage);
+    void spawnEnemyProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage, float maxRange);
     
     // Spawn accelerating projectile (starts slow, speeds up)
     void spawnAcceleratingProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage, 

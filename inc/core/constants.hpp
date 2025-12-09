@@ -56,10 +56,13 @@ constexpr int LOCKKEEPER_ROOM_MIN_WIDTH = 12;  // Shrinks to this in phase 3
 
 // Level 3 - Nanny: Narrow but tall, gauntlet phases with barges
 constexpr int NANNY_ROOM_WIDTH = 16;   // Narrow - min width
-constexpr int NANNY_ROOM_HEIGHT = 28;  // Very tall for gauntlet run
+constexpr int NANNY_ROOM_HEIGHT = 34;  // Very tall for gauntlet run
 constexpr float NANNY_BARGE_SPEED_1 = 0.12f;   // Gauntlet 1 stream speed
 constexpr float NANNY_BARGE_SPEED_2 = 0.16f;   // Gauntlet 2 stream speed (faster)
-constexpr float NANNY_BARGE_SPAWN_INTERVAL = 12.0f;  // Frames between barge spawns (continuous stream)
+// Spawn intervals calculated: (barge_width + gap) / speed = frames between spawns
+// Barge is 3 tiles wide, want ~0.5 tile gap between them
+constexpr float NANNY_BARGE_SPAWN_INTERVAL_1 = 29.0f;  // 3.5 / 0.12 = ~29 frames
+constexpr float NANNY_BARGE_SPAWN_INTERVAL_2 = 22.0f;  // 3.5 / 0.16 = ~22 frames
 constexpr int NANNY_MIN_GAPS_1 = 2;    // Minimum gaps in stream (gauntlet 1 - easier)
 constexpr int NANNY_MIN_GAPS_2 = 1;    // Minimum gaps in stream (gauntlet 2 - harder)
 
@@ -115,7 +118,7 @@ namespace Cheats {
     constexpr bool SHOW_DEBUG_INFO = false;
     
     // Fast player speed multiplier
-    constexpr float SPEED_MULTIPLIER = 1.5f;  // Set to 2.0f for double speed
+    constexpr float SPEED_MULTIPLIER = 1.0f;  // Set to 2.0f for double speed
 }
 
 }  // namespace Constants

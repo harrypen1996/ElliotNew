@@ -105,33 +105,28 @@ void Player::handleShootingInput(ProjectileManager* projectileManager) {
 
     const auto& rightJoy = pad->getRightJoyPad();
     
-    float projectileVelX = 0.0f;
-    float projectileVelY = 0.0f;
-    bool shouldShoot = false;
-
-    // Determine shooting direction from right stick
-    if (rightJoy.v <= 100) {
-        projectileVelY = -0.1f;
-        shouldShoot = true;
-    } else if (rightJoy.v >= 200) {
-        projectileVelY = 0.1f;
-        shouldShoot = true;
-    }
-
-    if (rightJoy.h <= 100) {
-        projectileVelX = -0.1f;
-        shouldShoot = true;
-    } else if (rightJoy.h >= 200) {
-        projectileVelX = 0.1f;
-        shouldShoot = true;
-    }
-
-    // Fire if stick is pushed and cooldown has elapsed
-    if (shouldShoot && shootTimer.getTimeDelta() > stats.getFireRate()) {
+    // Convert stick values (0-255) to -1.0 to 1.0 range
+    // Center is 128, so subtract and divide
+    float stickX = (static_cast<float>(rightJoy.h) - 128.0f) / 128.0f;
+    float stickY = (static_cast<float>(rightJoy.v) - 128.0f) / 128.0f;
+    
+    // Calculate magnitude of stick deflection
+    float magnitude = std::sqrt(stickX * stickX + stickY * stickY);
+    
+    // Deadzone threshold - only shoot if stick is pushed far enough
+    const float deadzone = 0.4f;
+    
+    if (magnitude > deadzone && shootTimer.getTimeDelta() > stats.getFireRate()) {
+        // Normalize the direction
+        float dirX = stickX / magnitude;
+        float dirY = stickY / magnitude;
+        
+        // Apply shot speed
+        float speed = 0.1f * stats.getShotSpeed();
+        
         projectileManager->spawnPlayerProjectile(
             position,
-            Tyra::Vec2(projectileVelX * stats.getShotSpeed(), 
-                       projectileVelY * stats.getShotSpeed()),
+            Tyra::Vec2(dirX * speed, dirY * speed),
             stats.getDamage()
         );
         shootTimer.prime();

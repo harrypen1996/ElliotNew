@@ -23,6 +23,11 @@ void ProjectileManager::spawnEnemyProjectile(Tyra::Vec2 position, Tyra::Vec2 vel
     projectiles.emplace_back(position, velocity, damage, false);
 }
 
+void ProjectileManager::spawnEnemyProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage, float maxRange) {
+    projectiles.emplace_back(position, velocity, damage, false);
+    projectiles.back().setMaxRange(maxRange);
+}
+
 void ProjectileManager::spawnAcceleratingProjectile(Tyra::Vec2 position, Tyra::Vec2 velocity, float damage,
                                                      float acceleration, float maxSpeed, bool fromPlayer) {
     projectiles.emplace_back(position, velocity, damage, fromPlayer);

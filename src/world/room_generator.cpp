@@ -244,9 +244,10 @@ void RoomGenerator::generateNannySideDoors(Room* room, int numDoorsPerSide) {
     //   doorY + 1: bottom edge frame
     //   doorY + 2: bottom corner frame
     
-    // Top buffer: boss at y~2 with 4-tile height, so boss ends around y=6
-    // First door's top frame (doorY-3) should be >= 7, meaning doorY >= 10
-    float topBuffer = 10.0f;  // First doorY must be at least this
+    // Top buffer: boss at y~2 with 4-tile height, ends around y=6
+    // Want significant gap between boss and first door
+    // First door's top frame (doorY-3) should have clearance from boss area
+    float topBuffer = 16.0f;  // First doorY must be at least this (pushes doors down)
     
     // Bottom buffer: player starts at bottom (y = height-3)
     // Last door's doorY+2 should be < height-4, meaning doorY < height-6
@@ -254,44 +255,24 @@ void RoomGenerator::generateNannySideDoors(Room* room, int numDoorsPerSide) {
     
     float minDoorY = topBuffer;
     float maxDoorY = static_cast<float>(height) - bottomBuffer;
-    float range = maxDoorY - minDoorY;
-    
-    if (range <= 0 || numDoorsPerSide <= 0) return;
-    
-    // Doors need at least 6 tiles spacing to avoid frame overlap:
-    // Door 1 bottom frame at doorY+2, Door 2 top frame at doorY-3
-    // If spacing = 6: door1+2 = Y+2, door2-3 = (Y+6)-3 = Y+3, gap of 1 tile
-    float minSpacing = 6.0f;
-    
-    // Calculate how many doors we can actually fit
-    int maxDoors = static_cast<int>(range / minSpacing) + 1;
-    if (numDoorsPerSide > maxDoors) {
-        numDoorsPerSide = maxDoors;
-    }
     
     if (numDoorsPerSide <= 0) return;
     
-    // Distribute doors evenly with proper spacing
-    float spacing;
-    if (numDoorsPerSide == 1) {
-        spacing = 0;  // Single door goes in middle
-    } else {
-        spacing = range / static_cast<float>(numDoorsPerSide - 1);
-        if (spacing < minSpacing) spacing = minSpacing;
-    }
+    // Fixed spacing between doors (not distributed across range)
+    float doorSpacing = 6.0f;  // 6 tiles between door centers (minimum for frame clearance)
     
+    // Calculate total space needed for all doors
+    float totalSpaceNeeded = doorSpacing * (numDoorsPerSide - 1);
+    
+    // Start doors from topBuffer and place them with fixed spacing
+    // This clusters them together rather than spreading across the room
     for (int i = 0; i < numDoorsPerSide; i++) {
-        // Calculate door center Y position
-        float doorY;
-        if (numDoorsPerSide == 1) {
-            doorY = minDoorY + range / 2.0f;  // Center single door
-        } else {
-            doorY = minDoorY + spacing * i;
-        }
+        float doorY = minDoorY + doorSpacing * i;
         
-        // Clamp to valid range
-        if (doorY < minDoorY) doorY = minDoorY;
-        if (doorY > maxDoorY) doorY = maxDoorY;
+        // Make sure we don't exceed the bottom boundary
+        if (doorY > maxDoorY) {
+            break;  // Can't fit more doors
+        }
         
         int doorYInt = static_cast<int>(doorY);
         
