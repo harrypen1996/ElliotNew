@@ -1110,7 +1110,7 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
         }
         
         case MobState::NANNY_GAUNTLET_ACTIVE: {
-            // Spawn barges from alternating sides
+            // Spawn barges from side door positions
             float bargeInterval = (mob.gauntletNumber == 1) ? 
                 Constants::NANNY_BARGE_INTERVAL_1 : Constants::NANNY_BARGE_INTERVAL_2;
             float bargeSpeed = (mob.gauntletNumber == 1) ? 
@@ -1121,13 +1121,30 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
             if (mob.bargeSpawnTimer >= bargeInterval) {
                 mob.bargeSpawnTimer = 0;
                 
-                // Spawn barge at a random Y position in the gauntlet zone
-                float minY = mob.gauntletStartY + 2.0f;
-                float maxY = roomHeight - 4.0f;
-                float bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
+                // Get side doors from room
+                const auto& sideDoors = room->getSideDoors();
                 
-                // Alternate sides, or random
-                bool fromLeft = (rand() % 2 == 0);
+                float bargeY;
+                bool fromLeft;
+                
+                if (!sideDoors.empty()) {
+                    // Pick a random door to spawn from
+                    int doorIndex = rand() % static_cast<int>(sideDoors.size());
+                    const auto& door = sideDoors[doorIndex];
+                    
+                    // Barge Y position matches the door's Y
+                    // Door opening is at yPosition-1 and yPosition, so center on yPosition-0.5
+                    bargeY = door.yPosition - 0.5f;
+                    fromLeft = door.isLeftSide;
+                } else {
+                    // Fallback: random Y position if no doors defined
+                    float minY = mob.gauntletStartY + 2.0f;
+                    float maxY = roomHeight - 4.0f;
+                    bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
+                    fromLeft = (rand() % 2 == 0);
+                }
+                
+                // Set barge start position and velocity based on side
                 float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
                 float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
                 
@@ -1139,7 +1156,8 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                 );
             }
             
-            // Check if player reached the goal
+            // Check if player reached the goal - this is the ONLY exit condition
+            // No timeout - player controls when gauntlet ends by reaching top
             if (player->position.y <= mob.gauntletStartY) {
                 mob.state = MobState::NANNY_GAUNTLET_END;
                 mob.stateTimer = 0;
@@ -1152,18 +1170,6 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                 }
                 
                 // Clear all barges (projectiles)
-                projectileManager->clear();
-            }
-            
-            // Safety timeout - after 20 seconds, end gauntlet anyway
-            if (mob.stateTimer >= 1200) {
-                mob.state = MobState::NANNY_GAUNTLET_END;
-                mob.stateTimer = 0;
-                if (mob.gauntletNumber == 1) {
-                    mob.gauntlet1Complete = true;
-                } else {
-                    mob.gauntlet2Complete = true;
-                }
                 projectileManager->clear();
             }
             break;

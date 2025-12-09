@@ -259,7 +259,7 @@ void Level::generateRoomTiles() {
                             width = Constants::LOCKKEEPER_ROOM_WIDTH;
                             height = Constants::LOCKKEEPER_ROOM_HEIGHT;
                             break;
-                        case 3:  // Nanny - TBD
+                        case 3:  // Nanny - narrow but tall with side doors for barges
                             width = Constants::NANNY_ROOM_WIDTH;
                             height = Constants::NANNY_ROOM_HEIGHT;
                             break;
@@ -293,6 +293,13 @@ void Level::generateRoomTiles() {
             height = (height / 2) * 2;
             
             room.generate(&roomGenerator, width, height);
+            
+            // Generate side doors for Nanny boss room (barge spawn points)
+            if (room.getType() == RoomType::BOSS && levelNumber == 3) {
+                // Generate 3 doors per side (doors are 6 tiles tall and need spacing)
+                roomGenerator.generateNannySideDoors(&room, 3);
+                TYRA_LOG("Generated side doors for Nanny boss room");
+            }
         }
     }
 }

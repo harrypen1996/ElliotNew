@@ -17,6 +17,9 @@ namespace CanalUx {
  * - Land: Walls and terrain (collision)
  * - Scenery: Obstacles, decorations, door blockers
  */
+// Forward declaration
+class Room;
+
 class RoomGenerator {
 public:
     RoomGenerator();
@@ -36,8 +39,15 @@ public:
                                                    bool doorLeft, bool doorRight,
                                                    bool doorTop, bool doorBottom,
                                                    bool cleared);
+    
+    // Generate side doors for Nanny boss room (barge spawn points)
+    // Creates openings on left and right walls at various Y positions
+    // numDoorsPerSide: how many doors on each wall (doors are 6 tiles tall, need spacing)
+    void generateNannySideDoors(Room* room, int numDoorsPerSide);
 
 private:
+    // Helper to create a single side door opening
+    void createSideDoorOpening(Room* room, int doorCenterY, bool isLeftWall);
     // Tile indices for your tileset (all2.png)
     // These map to positions in a 16x16 grid of 32x32 tiles (512x512 texture)
     

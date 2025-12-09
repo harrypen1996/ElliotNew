@@ -3,6 +3,7 @@
  */
 
 #include "world/room_generator.hpp"
+#include "world/room.hpp"
 
 namespace CanalUx {
 
@@ -224,6 +225,165 @@ std::vector<std::vector<int>> RoomGenerator::generateScenery(
     // TODO: Add random obstacles (shopping carts, logs, etc.)
     
     return scenery;
+}
+
+void RoomGenerator::generateNannySideDoors(Room* room, int numDoorsPerSide) {
+    if (!room) return;
+    
+    int height = room->getHeight();
+    
+    // Clear any existing side doors
+    room->clearSideDoors();
+    
+    // Calculate the gauntlet zone (where barges can spawn)
+    // Door structure is 6 tiles tall:
+    //   doorY - 3: top corner frame
+    //   doorY - 2: top edge frame
+    //   doorY - 1: opening (passable)
+    //   doorY:     opening (passable)
+    //   doorY + 1: bottom edge frame
+    //   doorY + 2: bottom corner frame
+    
+    // Top buffer: boss at y~2, need room below + door top frame
+    // So first door's doorY-3 should be >= 8 (boss area), meaning doorY >= 11
+    float topBuffer = 11.0f;  // First doorY must be at least this
+    
+    // Bottom buffer: player starts at bottom, need clearance
+    // Last door's doorY+2 should be < height-4, meaning doorY < height-6
+    float bottomBuffer = 6.0f;
+    
+    float minDoorY = topBuffer;
+    float maxDoorY = static_cast<float>(height) - bottomBuffer;
+    float range = maxDoorY - minDoorY;
+    
+    if (range <= 0 || numDoorsPerSide <= 0) return;
+    
+    // Doors need at least 8 tiles spacing to avoid frame overlap:
+    // Door 1 bottom frame at doorY+2, Door 2 top frame at doorY-3
+    // If spacing = 8: door1+2 = Y+2, door2-3 = (Y+8)-3 = Y+5, gap of 3 tiles
+    float minSpacing = 8.0f;
+    
+    // Calculate how many doors we can actually fit
+    int maxDoors = static_cast<int>(range / minSpacing) + 1;
+    if (numDoorsPerSide > maxDoors) {
+        numDoorsPerSide = maxDoors;
+    }
+    
+    if (numDoorsPerSide <= 0) return;
+    
+    // Distribute doors evenly with proper spacing
+    float spacing;
+    if (numDoorsPerSide == 1) {
+        spacing = 0;  // Single door goes in middle
+    } else {
+        spacing = range / static_cast<float>(numDoorsPerSide - 1);
+        if (spacing < minSpacing) spacing = minSpacing;
+    }
+    
+    for (int i = 0; i < numDoorsPerSide; i++) {
+        // Calculate door center Y position
+        float doorY;
+        if (numDoorsPerSide == 1) {
+            doorY = minDoorY + range / 2.0f;  // Center single door
+        } else {
+            doorY = minDoorY + spacing * i;
+        }
+        
+        // Clamp to valid range
+        if (doorY < minDoorY) doorY = minDoorY;
+        if (doorY > maxDoorY) doorY = maxDoorY;
+        
+        int doorYInt = static_cast<int>(doorY);
+        
+        // Create left door at this Y
+        room->addSideDoor(doorY, true);
+        createSideDoorOpening(room, doorYInt, true);
+        
+        // Create right door at the same Y (mirrored)
+        room->addSideDoor(doorY, false);
+        createSideDoorOpening(room, doorYInt, false);
+    }
+}
+
+void RoomGenerator::createSideDoorOpening(Room* room, int doorCenterY, bool isLeftWall) {
+    // Create a door opening following the same pattern as the normal left/right doors
+    // Door structure (6 tiles tall):
+    //   doorCenterY - 3: top frame
+    //   doorCenterY - 2: top frame edge
+    //   doorCenterY - 1: opening (passable)
+    //   doorCenterY:     opening (passable)
+    //   doorCenterY + 1: bottom frame edge
+    //   doorCenterY + 2: bottom frame
+    
+    int width = room->getWidth();
+    
+    if (isLeftWall) {
+        // LEFT WALL DOOR (columns 0 and 1)
+        // Clear the opening (2 tiles high)
+        for (int y = doorCenterY - 1; y <= doorCenterY; y++) {
+            room->setLandTile(0, y, 0);
+            room->setLandTile(1, y, 0);
+        }
+        
+        // Add water to the opening
+        for (int y = doorCenterY - 1; y <= doorCenterY; y++) {
+            room->setWaterTile(0, y, WATER_FILL);
+            room->setWaterTile(1, y, WATER_FILL);
+        }
+        
+        // Add water transition above opening
+        room->setWaterTile(0, doorCenterY - 2, WATER_DOOR_TRANSITION);
+        room->setWaterTile(1, doorCenterY - 2, WATER_TRANSITION_TL);
+        
+        // Add water below opening
+        room->setWaterTile(0, doorCenterY + 1, WATER_FILL);
+        
+        // Add door frame tiles (land layer)
+        // Top frame
+        room->setLandTile(0, doorCenterY - 3, LAND_DOOR_TOP_L);
+        room->setLandTile(0, doorCenterY - 2, LAND_EDGE_TOP);
+        room->setLandTile(1, doorCenterY - 2, LAND_DOOR_EDGE_TOP_L);
+        
+        // Bottom frame
+        room->setLandTile(0, doorCenterY + 2, LAND_DOOR_BOTTOM_L);
+        room->setLandTile(0, doorCenterY + 1, LAND_EDGE_BOTTOM);
+        room->setLandTile(1, doorCenterY + 1, LAND_DOOR_EDGE_BOTTOM_L);
+        
+    } else {
+        // RIGHT WALL DOOR (columns width-2 and width-1)
+        int col1 = width - 2;  // Inner column
+        int col2 = width - 1;  // Outer wall column
+        
+        // Clear the opening (2 tiles high)
+        for (int y = doorCenterY - 1; y <= doorCenterY; y++) {
+            room->setLandTile(col1, y, 0);
+            room->setLandTile(col2, y, 0);
+        }
+        
+        // Add water to the opening
+        for (int y = doorCenterY - 1; y <= doorCenterY; y++) {
+            room->setWaterTile(col1, y, WATER_FILL);
+            room->setWaterTile(col2, y, WATER_FILL);
+        }
+        
+        // Add water transition above opening
+        room->setWaterTile(col1, doorCenterY - 2, WATER_TRANSITION_TR);
+        room->setWaterTile(col2, doorCenterY - 2, WATER_DOOR_SIDE);
+        
+        // Add water below opening
+        room->setWaterTile(col2, doorCenterY + 1, WATER_FILL);
+        
+        // Add door frame tiles (land layer)
+        // Top frame
+        room->setLandTile(col2, doorCenterY - 3, LAND_WALL_RIGHT);  // Keep wall corner
+        room->setLandTile(col1, doorCenterY - 2, LAND_DOOR_EDGE_TOP_R);
+        room->setLandTile(col2, doorCenterY - 2, LAND_EDGE_TOP);
+        
+        // Bottom frame
+        room->setLandTile(col2, doorCenterY + 2, LAND_WALL_RIGHT);  // Keep wall corner
+        room->setLandTile(col1, doorCenterY + 1, LAND_DOOR_EDGE_BOTTOM_R);
+        room->setLandTile(col2, doorCenterY + 1, LAND_EDGE_BOTTOM);
+    }
 }
 
 }  // namespace CanalUx

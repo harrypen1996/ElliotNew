@@ -121,6 +121,22 @@ void Room::setSceneryTile(int x, int y, int tileId) {
     }
 }
 
+void Room::setLandTile(int x, int y, int tileId) {
+    if (y >= 0 && y < height && x >= 0 && x < width) {
+        landMap[y][x] = tileId;
+    }
+}
+
+void Room::setWaterTile(int x, int y, int tileId) {
+    if (y >= 0 && y < height && x >= 0 && x < width) {
+        waterMap[y][x] = tileId;
+    }
+}
+
+void Room::addSideDoor(float yPosition, bool isLeftSide) {
+    sideDoors.emplace_back(yPosition, isLeftSide);
+}
+
 void Room::addObstacle(const RoomObstacle& obstacle) {
     obstacles.push_back(obstacle);
 }

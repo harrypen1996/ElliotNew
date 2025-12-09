@@ -24,6 +24,18 @@ enum class RoomType {
 };
 
 /**
+ * Side door/entrance for Nanny boss room barge spawning
+ * Doors are 6 tiles tall total (2 frame above + 2 opening + 2 frame below)
+ */
+struct SideDoor {
+    float yPosition;     // Y tile position of the door CENTER (the opening is at y-1 and y)
+    bool isLeftSide;     // true = left wall, false = right wall
+    
+    SideDoor() : yPosition(0), isLeftSide(true) {}
+    SideDoor(float y, bool left) : yPosition(y), isLeftSide(left) {}
+};
+
+/**
  * Obstacle placed during gameplay (e.g., trolley from Lock Keeper)
  */
 struct RoomObstacle {
@@ -59,6 +71,8 @@ public:
     int getWaterTile(int x, int y) const;
     int getSceneryTile(int x, int y) const;
     void setSceneryTile(int x, int y, int tileId);
+    void setLandTile(int x, int y, int tileId);
+    void setWaterTile(int x, int y, int tileId);
     
     // Dynamic obstacles (runtime)
     void addObstacle(const RoomObstacle& obstacle);
@@ -103,6 +117,11 @@ public:
 
     // Spawn point for player entering this room
     Tyra::Vec2 getSpawnPoint(int entryDirection) const;
+    
+    // Side doors for Nanny boss room (barge spawn points)
+    void addSideDoor(float yPosition, bool isLeftSide);
+    const std::vector<SideDoor>& getSideDoors() const { return sideDoors; }
+    void clearSideDoors() { sideDoors.clear(); }
 
 private:
     // Tile maps (y, x indexing)
@@ -112,6 +131,9 @@ private:
     
     // Dynamic obstacles
     std::vector<RoomObstacle> obstacles;
+    
+    // Side doors for Nanny boss room (barge spawn points)
+    std::vector<SideDoor> sideDoors;
     
     // Arena bounds (can shrink during boss fights)
     float arenaMinX;
