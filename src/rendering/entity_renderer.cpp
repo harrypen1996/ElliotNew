@@ -312,7 +312,8 @@ void EntityRenderer::renderMobs(Tyra::Renderer2D* renderer,
         sprite.scale = mob.size.x / tileSize;
 
         // Flip sprite based on facing direction
-        if (!mob.facingRight) {
+        // Sprites are drawn facing LEFT by default, so flip when facing right
+        if (mob.facingRight) {
             sprite.flipHorizontal = true;
         }
         
@@ -482,7 +483,8 @@ void EntityRenderer::renderPikeBoss(Tyra::Renderer2D* renderer,
     sprite.scale = scale;
 
     // Flip sprite based on facing direction
-    if (!pike.facingRight) {
+    // Sprites are drawn facing LEFT by default, so flip when facing right
+    if (pike.facingRight) {
         sprite.flipHorizontal = true;
     }
     
@@ -549,7 +551,8 @@ void EntityRenderer::renderLockKeeperBoss(Tyra::Renderer2D* renderer,
     sprite.scale *= scaleModifier;
     
     // Flip sprite based on facing direction
-    if (!lk.facingRight) {
+    // Sprites are drawn facing LEFT by default, so flip when facing right
+    if (lk.facingRight) {
         sprite.flipHorizontal = true;
     }
     
@@ -608,7 +611,8 @@ void EntityRenderer::renderNannyBoss(Tyra::Renderer2D* renderer,
     sprite.position = screenPos;
     
     // Flip based on facing direction
-    sprite.flipHorizontal = !nanny.facingRight;
+    // Sprites are drawn facing LEFT by default, so flip when facing right
+    sprite.flipHorizontal = nanny.facingRight;
     
     // Flash red during gauntlet
     if (nanny.state == MobState::NANNY_GAUNTLET_ACTIVE) {

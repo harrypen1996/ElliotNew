@@ -44,6 +44,10 @@ public:
     // Creates openings on left and right walls at various Y positions
     // numDoorsPerSide: how many doors on each wall (doors are 6 tiles tall, need spacing)
     void generateNannySideDoors(Room* room, int numDoorsPerSide);
+    
+    // Place danger signs next to a door (indicates boss room ahead)
+    // direction: 0=left, 1=right, 2=top, 3=bottom
+    void placeDangerSigns(Room* room, int direction);
 
 private:
     // Helper to create a single side door opening
@@ -98,6 +102,9 @@ private:
     static constexpr int LOCK_GATE_BOTTOM = 64;
     static constexpr int LOCK_GATE_LEFT = 140;
     static constexpr int LOCK_GATE_RIGHT = 156;
+    
+    // Danger sign for boss room entrances (using lock gate sprite for now)
+    static constexpr int DANGER_SIGN = 63;  // Same as LOCK_GATE_TOP
 };
 
 }  // namespace CanalUx

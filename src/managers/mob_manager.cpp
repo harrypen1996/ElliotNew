@@ -624,7 +624,7 @@ void MobManager::updatePikeBoss(MobData& mob, Room* room, Player* player, Projec
             if (mob.stateTimer < 15) {
                 // Wind up - tail rising
             } else if (mob.stateTimer == 15) {
-                // Release projectiles in an arc
+                // Release projectiles in an arc from pike center
                 int numProjectiles = 4 + mob.phase;  // 5, 6, 7 projectiles
                 float arcSpread = 1.0f + mob.phase * 0.15f;  // Wider arc in later phases
                 
@@ -632,8 +632,8 @@ void MobManager::updatePikeBoss(MobData& mob, Room* room, Player* player, Projec
                     float angle = mob.tailSweepAngle - arcSpread + (arcSpread * 2.0f * i / (numProjectiles - 1));
                     
                     Tyra::Vec2 projPos = mob.position;
-                    projPos.x += 0.5f;
-                    projPos.y += 0.5f;
+                    projPos.x += 1.5f;  // Center X (half of 3 tile width)
+                    projPos.y += 0.75f; // Center Y (half of 1.5 tile height)
                     
                     Tyra::Vec2 projVel;
                     projVel.x = std::cos(angle) * (0.04f + mob.phase * 0.01f);
@@ -671,14 +671,15 @@ void MobManager::updatePikeBoss(MobData& mob, Room* room, Player* player, Projec
                     clampToRoom();
                 }
             } else if (mob.stateTimer == 55) {
-                // Crash down - spawn splash projectiles in all directions
+                // Crash down - spawn splash projectiles in all directions from center of pike
+                // Pike is 3 tiles wide x 1.5 tiles tall, so center is at (1.5, 0.75)
                 int numSplash = 8 + mob.phase * 2;  // 10, 12, 14 projectiles
                 for (int i = 0; i < numSplash; i++) {
                     float angle = (6.28f / numSplash) * i;
                     
                     Tyra::Vec2 projPos = mob.position;
-                    projPos.x += 0.5f;
-                    projPos.y += 0.5f;
+                    projPos.x += 1.5f;  // Center X (half of 3 tile width)
+                    projPos.y += 0.75f; // Center Y (half of 1.5 tile height)
                     
                     Tyra::Vec2 projVel;
                     projVel.x = std::cos(angle) * (0.03f + mob.phase * 0.01f);

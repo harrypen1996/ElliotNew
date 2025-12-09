@@ -60,6 +60,7 @@ private:
     void generateRoomLayout();
     void assignSpecialRooms();
     void generateRoomTiles();
+    void placeBossRoomDangerSigns();
     
     // Layout helpers
     bool isValidGridPosition(int x, int y) const;

@@ -302,6 +302,9 @@ void Level::generateRoomTiles() {
             }
         }
     }
+    
+    // Place danger signs in the room leading to the boss room
+    placeBossRoomDangerSigns();
 }
 
 bool Level::isValidGridPosition(int x, int y) const {
@@ -436,6 +439,56 @@ void Level::printDebugMap() const {
     }
     
     TYRA_LOG("===================");
+}
+
+void Level::placeBossRoomDangerSigns() {
+    // Find the boss room grid position
+    int bossX = -1, bossY = -1;
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        for (int x = 0; x < GRID_WIDTH; x++) {
+            if (grid[y][x].isGenerated() && grid[y][x].getType() == RoomType::BOSS) {
+                bossX = x;
+                bossY = y;
+                break;
+            }
+        }
+        if (bossX >= 0) break;
+    }
+    
+    if (bossX < 0) {
+        TYRA_LOG("Warning: No boss room found for danger signs");
+        return;
+    }
+    
+    // Find the adjacent room that connects to the boss room
+    // Direction vectors: Left, Right, Up, Down
+    const int directions[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    
+    for (int dir = 0; dir < 4; dir++) {
+        int adjX = bossX + directions[dir][0];
+        int adjY = bossY + directions[dir][1];
+        
+        if (!roomExists(adjX, adjY)) continue;
+        
+        Room& adjRoom = grid[adjY][adjX];
+        
+        // Check if this room has a door leading to the boss room
+        // The door direction from adjRoom's perspective is opposite
+        int doorDir = -1;
+        if (dir == 0 && adjRoom.hasRightDoor()) doorDir = 1;      // Boss is left, adj has right door
+        else if (dir == 1 && adjRoom.hasLeftDoor()) doorDir = 0;  // Boss is right, adj has left door
+        else if (dir == 2 && adjRoom.hasBottomDoor()) doorDir = 3; // Boss is up, adj has bottom door
+        else if (dir == 3 && adjRoom.hasTopDoor()) doorDir = 2;    // Boss is down, adj has top door
+        
+        if (doorDir >= 0) {
+            // Place danger signs in this room next to the door leading to boss
+            roomGenerator.placeDangerSigns(&adjRoom, doorDir);
+            TYRA_LOG("Placed danger signs in room (", adjX, ", ", adjY, ") direction ", doorDir);
+            return;  // Only one room connects to boss (it's a dead end)
+        }
+    }
+    
+    TYRA_LOG("Warning: No adjacent room found connecting to boss room");
 }
 
 }  // namespace CanalUx

@@ -134,9 +134,10 @@ void Player::handleShootingInput(ProjectileManager* projectileManager) {
 }
 
 void Player::handleSubmergeInput() {
-    if (pad->getPressed().Circle) {
+    // R2 trigger to submerge
+    if (pad->getPressed().R2) {
         trySubmerge();
-    } else if (submerged && !pad->getPressed().Circle) {
+    } else if (submerged && !pad->getPressed().R2) {
         // Released button - start surfacing
         // For now, instant surface. Could add a delay.
         submerged = false;

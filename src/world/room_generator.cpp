@@ -367,4 +367,46 @@ void RoomGenerator::createSideDoorOpening(Room* room, int doorCenterY, bool isLe
     }
 }
 
+void RoomGenerator::placeDangerSigns(Room* room, int direction) {
+    if (!room) return;
+    
+    int width = room->getWidth();
+    int height = room->getHeight();
+    int midWidth = width / 2;
+    int midHeight = height / 2;
+    
+    // Place danger signs on both sides of the door opening
+    // direction: 0=left, 1=right, 2=top, 3=bottom
+    
+    switch (direction) {
+        case 0:  // Left door - place signs above and below the door
+            // Door is at column 1, rows midHeight-1 to midHeight
+            // Place signs at (2, midHeight-2) and (2, midHeight+1)
+            room->setSceneryTile(2, midHeight - 2, DANGER_SIGN);
+            room->setSceneryTile(2, midHeight + 1, DANGER_SIGN);
+            break;
+            
+        case 1:  // Right door - place signs above and below the door
+            // Door is at column width-2, rows midHeight-1 to midHeight
+            // Place signs at (width-3, midHeight-2) and (width-3, midHeight+1)
+            room->setSceneryTile(width - 3, midHeight - 2, DANGER_SIGN);
+            room->setSceneryTile(width - 3, midHeight + 1, DANGER_SIGN);
+            break;
+            
+        case 2:  // Top door - place signs on left and right of the door
+            // Door is at row 1, columns midWidth-1 to midWidth
+            // Place signs at (midWidth-2, 2) and (midWidth+1, 2)
+            room->setSceneryTile(midWidth - 2, 2, DANGER_SIGN);
+            room->setSceneryTile(midWidth + 1, 2, DANGER_SIGN);
+            break;
+            
+        case 3:  // Bottom door - place signs on left and right of the door
+            // Door is at row height-2, columns midWidth-1 to midWidth
+            // Place signs at (midWidth-2, height-3) and (midWidth+1, height-3)
+            room->setSceneryTile(midWidth - 2, height - 3, DANGER_SIGN);
+            room->setSceneryTile(midWidth + 1, height - 3, DANGER_SIGN);
+            break;
+    }
+}
+
 }  // namespace CanalUx

@@ -128,6 +128,11 @@ void Game::handleInput() {
                 TYRA_LOG("CanalUx: Resetting level...");
                 startNewGame();
             }
+
+            if (engine->pad.getPressed().Triangle) {
+                TYRA_LOG("CanalUx: advance level...");
+                advanceToNextLevel();
+            }
             break;
             
         case GameState::PAUSED:
