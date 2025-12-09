@@ -1112,59 +1112,57 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
         }
         
         case MobState::NANNY_GAUNTLET_ACTIVE: {
-            // Spawn waves of barges with gaps for player to pass through
-            float waveInterval = (mob.gauntletNumber == 1) ? 
-                Constants::NANNY_WAVE_INTERVAL_1 : Constants::NANNY_WAVE_INTERVAL_2;
+            // Continuous streams of barges with gaps
+            // All doors on one side spawn together, creating a wall with holes
+            // Player must find and swim through the gaps
+            
             float bargeSpeed = (mob.gauntletNumber == 1) ? 
                 Constants::NANNY_BARGE_SPEED_1 : Constants::NANNY_BARGE_SPEED_2;
-            int gapSize = (mob.gauntletNumber == 1) ? 
-                Constants::NANNY_GAP_SIZE_1 : Constants::NANNY_GAP_SIZE_2;
+            int minGaps = (mob.gauntletNumber == 1) ? 
+                Constants::NANNY_MIN_GAPS_1 : Constants::NANNY_MIN_GAPS_2;
             
             mob.bargeSpawnTimer++;
             
-            if (mob.bargeSpawnTimer >= waveInterval) {
+            // Spawn barges frequently to create continuous stream
+            if (mob.bargeSpawnTimer >= Constants::NANNY_BARGE_SPAWN_INTERVAL) {
                 mob.bargeSpawnTimer = 0;
                 
                 // Get side doors from room
                 const auto& sideDoors = room->getSideDoors();
                 
                 if (!sideDoors.empty()) {
-                    // Separate doors by side
-                    std::vector<int> leftDoors;
-                    std::vector<int> rightDoors;
+                    // Always spawn from left side (going right)
+                    bool fromLeft = true;
+                    
+                    // Collect doors on the left side
+                    std::vector<int> activeDoorIndices;
                     for (size_t i = 0; i < sideDoors.size(); i++) {
-                        if (sideDoors[i].isLeftSide) {
-                            leftDoors.push_back(static_cast<int>(i));
-                        } else {
-                            rightDoors.push_back(static_cast<int>(i));
+                        if (sideDoors[i].isLeftSide == fromLeft) {
+                            activeDoorIndices.push_back(static_cast<int>(i));
                         }
                     }
                     
-                    // Alternate which side the wave comes from
-                    mob.waveCounter++;
-                    bool fromLeft = (mob.waveCounter % 2 == 0);
-                    const std::vector<int>& activeDoors = fromLeft ? leftDoors : rightDoors;
+                    int numDoors = static_cast<int>(activeDoorIndices.size());
                     
-                    if (!activeDoors.empty()) {
-                        int numDoors = static_cast<int>(activeDoors.size());
+                    if (numDoors > 0) {
+                        // Randomly select which doors have gaps
+                        // Ensure at least minGaps doors are skipped
+                        std::vector<bool> hasGap(numDoors, false);
+                        int gapsCreated = 0;
                         
-                        // Choose gap position (which doors to skip)
-                        // Gap shifts each wave to force player movement
-                        int gapStart = (mob.waveCounter / 2) % numDoors;
-                        
-                        // Spawn barges from all doors EXCEPT the gap
-                        for (int i = 0; i < numDoors; i++) {
-                            // Check if this door is part of the gap
-                            bool isGap = false;
-                            for (int g = 0; g < gapSize; g++) {
-                                if (i == (gapStart + g) % numDoors) {
-                                    isGap = true;
-                                    break;
-                                }
+                        // Guarantee minimum gaps
+                        while (gapsCreated < minGaps && gapsCreated < numDoors) {
+                            int doorIdx = rand() % numDoors;
+                            if (!hasGap[doorIdx]) {
+                                hasGap[doorIdx] = true;
+                                gapsCreated++;
                             }
-                            
-                            if (!isGap) {
-                                const auto& door = sideDoors[activeDoors[i]];
+                        }
+                        
+                        // Spawn barges from doors without gaps
+                        for (int i = 0; i < numDoors; i++) {
+                            if (!hasGap[i]) {
+                                const auto& door = sideDoors[activeDoorIndices[i]];
                                 float bargeY = door.yPosition - 0.5f;
                                 float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
                                 float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
@@ -1177,36 +1175,19 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                             }
                         }
                     }
-                } else {
-                    // Fallback if no doors - single random barge
-                    float minY = mob.gauntletStartY + 2.0f;
-                    float maxY = roomHeight - 4.0f;
-                    float bargeY = minY + static_cast<float>(rand() % static_cast<int>(maxY - minY));
-                    bool fromLeft = (rand() % 2 == 0);
-                    float bargeX = fromLeft ? -3.0f : roomWidth + 1.0f;
-                    float bargeVelX = fromLeft ? bargeSpeed : -bargeSpeed;
-                    
-                    projectileManager->spawnBarge(
-                        Tyra::Vec2(bargeX, bargeY),
-                        Tyra::Vec2(bargeVelX, 0),
-                        999.0f
-                    );
                 }
             }
             
-            // Boss shoots projectiles during gauntlet in rotating pattern
+            // Boss shoots projectiles in rotating pattern
             if (mob.actionCooldown <= 0) {
-                // Rotating angle for circular spray pattern
-                float rotationSpeed = (mob.gauntletNumber == 1) ? 0.4f : 0.6f;
+                float rotationSpeed = (mob.gauntletNumber == 1) ? 0.5f : 0.7f;
                 mob.circleAngle += rotationSpeed;
                 if (mob.circleAngle > 6.28f) mob.circleAngle -= 6.28f;
                 
-                // Shoot projectiles in current rotation direction
                 int numShots = (mob.gauntletNumber == 1) ? 2 : 3;
-                float projSpeed = (mob.gauntletNumber == 1) ? 0.06f : 0.08f;
+                float projSpeed = (mob.gauntletNumber == 1) ? 0.08f : 0.10f;
                 
                 for (int i = 0; i < numShots; i++) {
-                    // Spread shots around the current angle
                     float angle = mob.circleAngle + (6.28f / numShots) * i;
                     float velX = std::cos(angle) * projSpeed;
                     float velY = std::sin(angle) * projSpeed;
@@ -1217,8 +1198,7 @@ void MobManager::updateNannyBoss(MobData& mob, Room* room, Player* player, Proje
                     projectileManager->spawnEnemyProjectile(projPos, projVel, 1.0f);
                 }
                 
-                // Faster firing during gauntlet 2
-                mob.actionCooldown = (mob.gauntletNumber == 1) ? 25.0f : 15.0f;
+                mob.actionCooldown = (mob.gauntletNumber == 1) ? 20.0f : 12.0f;
             }
             
             // Check if player reached the goal
